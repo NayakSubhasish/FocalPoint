@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Project Management System
 
 A modern project management web application with role-based access control.
@@ -96,3 +97,6 @@ REACT_APP_API_URL=http://localhost:5000
 ## License
 
 MIT 
+=======
+# FocalPoint
+>>>>>>> cd96dc6c111d2274be0e3a2778e82faed9761a0e
