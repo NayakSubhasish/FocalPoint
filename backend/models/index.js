@@ -58,6 +58,12 @@ sequelize.sync({ alter: true })
   })
   .catch((err) => {
     console.error('Error syncing database:', err);
+    if (err.parent) {
+      console.error('Database error details:', err.parent.message);
+    }
+    if (err.original) {
+      console.error('Original error object:', err.original);
+    }
   });
 
 module.exports = db; 
