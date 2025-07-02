@@ -41,29 +41,34 @@ Object.keys(db).forEach((modelName) => {
 // Import seeders
 const adminSeeder = require('../seeders/adminSeeder');
 
-// Sync database and run seeders
-sequelize.sync()
-  .then(async () => {
-    console.log('Database synced successfully');
-    try {
-      // Check if admin exists
-      const adminExists = await db.User.findOne({ where: { email: 'admin@project.com' } });
-      if (!adminExists) {
-        await adminSeeder.up(db.sequelize.getQueryInterface(), Sequelize);
-        console.log('Admin user created successfully');
+// Run database sync and seed only in development
+if (process.env.NODE_ENV !== 'production') {
+  console.log('Environment is development: syncing database...');
+  sequelize.sync()
+    .then(async () => {
+      console.log('Database synced successfully');
+      try {
+        // Check if admin exists
+        const adminExists = await db.User.findOne({ where: { email: 'admin@project.com' } });
+        if (!adminExists) {
+          await adminSeeder.up(db.sequelize.getQueryInterface(), Sequelize);
+          console.log('Admin user created successfully');
+        }
+      } catch (error) {
+        console.error('Error running seeders:', error);
       }
-    } catch (error) {
-      console.error('Error running seeders:', error);
-    }
-  })
-  .catch((err) => {
-    console.error('Error syncing database:', err);
-    if (err.parent) {
-      console.error('Database error details:', err.parent.message);
-    }
-    if (err.original) {
-      console.error('Original error object:', err.original);
-    }
-  });
+    })
+    .catch((err) => {
+      console.error('Error syncing database:', err);
+      if (err.parent) {
+        console.error('Database error details:', err.parent.message);
+      }
+      if (err.original) {
+        console.error('Original error object:', err.original);
+      }
+    });
+} else {
+  console.log('Production environment detected: skipping database sync. Ensure the DB schema is already created.');
+}
 
 module.exports = db; 
