@@ -2,16 +2,16 @@ const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
 const sequelize = new Sequelize(
-  process.env.DB_NAME,         // 'TaskTracker'
-  process.env.DB_USER,         // 'tasktracker_subhasish'
-  process.env.DB_PASSWORD,     // 'g]?>.2#22ZW%'
+  process.env.DB_NAME,
+  process.env.DB_USER,
+  process.env.DB_PASSWORD,
   {
-    host: process.env.DB_HOST, // '50.28.38.144'
-    port: process.env.DB_PORT, // 1433 (default for MSSQL, not 3306)
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT || 1433,
     dialect: 'mssql',
     dialectOptions: {
       options: {
-        encrypt: false, // or true if required
+        encrypt: false,
         trustServerCertificate: true
       }
     },
