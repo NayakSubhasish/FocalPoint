@@ -2,13 +2,19 @@ const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
 const sequelize = new Sequelize(
-  process.env.DB_NAME || 'project',
-  process.env.DB_USER || 'root',
-  process.env.DB_PASSWORD || '',
+  process.env.DB_NAME,         // 'TaskTracker'
+  process.env.DB_USER,         // 'tasktracker_subhasish'
+  process.env.DB_PASSWORD,     // 'g]?>.2#22ZW%'
   {
-    host: process.env.DB_HOST || '127.0.0.1',
-    port: process.env.DB_PORT || 3306,
-    dialect: 'mysql',
+    host: process.env.DB_HOST, // '50.28.38.144'
+    port: process.env.DB_PORT, // 1433 (default for MSSQL, not 3306)
+    dialect: 'mssql',
+    dialectOptions: {
+      options: {
+        encrypt: false, // Set to true if using Azure SQL or require encryption
+        trustServerCertificate: true // For local/self-signed certs
+      }
+    },
     logging: false,
   }
 );
