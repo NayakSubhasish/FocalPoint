@@ -11,8 +11,8 @@ const sequelize = new Sequelize(
     dialect: 'mssql',
     dialectOptions: {
       options: {
-        encrypt: false, // Set to true if using Azure SQL or require encryption
-        trustServerCertificate: true // For local/self-signed certs
+        encrypt: false, // or true if required
+        trustServerCertificate: true
       }
     },
     logging: false,
