@@ -42,7 +42,7 @@ Object.keys(db).forEach((modelName) => {
 const adminSeeder = require('../seeders/adminSeeder');
 
 // Sync database and run seeders
-sequelize.sync({ alter: true })
+sequelize.sync()
   .then(async () => {
     console.log('Database synced successfully');
     try {
