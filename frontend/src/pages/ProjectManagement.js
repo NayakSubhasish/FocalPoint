@@ -267,11 +267,13 @@ const ProjectManagement = () => {
     setProjectToDelete(null);
   };
 
-  const getBillingMethodColor = (method) => {
-    switch (method) {
-      case 'hourly': return 'primary';
-      case 'fixed': return 'success';
-      case 'per_transaction': return 'warning';
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'active': return 'success'; // green
+      case 'completed': return 'primary'; // blue
+      case 'on_hold': return 'info'; // light blue
+      case 'planning': return 'warning'; // orange
+      case 'cancelled': return 'error'; // red
       default: return 'default';
     }
   };
@@ -387,7 +389,13 @@ const ProjectManagement = () => {
                       <TableCell>{project.manager?.name || 'Unassigned'}</TableCell>
                       <TableCell>{project.teamMembers?.find(tm => tm.ProjectTeam.role === 'lead')?.name || '—'}</TableCell>
                       <TableCell>{project.teamMembers?.filter(tm => tm.ProjectTeam.role === 'member').map(tm => tm.name).join(', ') || '—'}</TableCell>
-                      <TableCell><Chip label={project.status} color={getBillingMethodColor(project.billingMethod)} /></TableCell>
+                      <TableCell>
+                        <Chip
+                          label={project.status}
+                          color={getStatusColor(project.status)}
+                          onClick={() => {}}
+                        />
+                      </TableCell>
                       <TableCell>
                         {user.role !== 'team_member' && (
                           <>
