@@ -1,5 +1,5 @@
 const express = require('express');
-const { User, Project, Task, sequelize } = require('../models');
+const { User, Project, Task, TimeEntry, sequelize } = require('../models');
 const { auth, authorize } = require('../middleware/auth');
 const { Op } = require('sequelize');
 
@@ -57,10 +57,18 @@ router.get('/stats', auth, async (req, res) => {
       return acc;
     }, {});
     
-    // Set default values for removed time tracking
-    stats.totalHours = 0;
-    stats.weeklyHours = 0;
-    stats.transactions = 0;
+    // Compute time tracking metrics
+    stats.totalHours = (await TimeEntry.sum('hours', { where: dateFilter })) || 0;
+    stats.totalTransactions = (await TimeEntry.sum('transactions', { where: dateFilter })) || 0;
+
+    // Active projects count
+    stats.activeProjects = stats.projectsByStatus['active'] || 0;
+
+    // Completed and pending tasks counts
+    stats.completedTasks = stats.tasksByStatus['completed'] || 0;
+    stats.pendingTasks = (stats.tasksByStatus['todo'] || 0)
+                       + (stats.tasksByStatus['in_progress'] || 0)
+                       + (stats.tasksByStatus['review'] || 0);
     
     res.json(stats);
   } catch (error) {
