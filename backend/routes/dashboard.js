@@ -19,13 +19,14 @@ router.get('/stats', auth, async (req, res) => {
   try {
     const stats = {};
     const dateFilter = getDateFilter(req.query);
-    
+
     // Total counts
     stats.totalUsers = await User.count();
     stats.totalProjects = await Project.count({ where: dateFilter });
     stats.totalTasks = await Task.count({ where: dateFilter });
-    
-    // Project status breakdown
+
+    // Project status breakdown (ensure all statuses are present)
+    const allProjectStatuses = ['planning', 'active', 'on_hold', 'completed', 'cancelled'];
     const projectStatuses = await Project.findAll({
       attributes: [
         'status',
@@ -35,13 +36,14 @@ router.get('/stats', auth, async (req, res) => {
       group: ['status'],
       raw: true
     });
-    
-    stats.projectsByStatus = projectStatuses.reduce((acc, item) => {
-      acc[item.status] = parseInt(item.count);
+    stats.projectsByStatus = allProjectStatuses.reduce((acc, status) => {
+      const found = projectStatuses.find(item => item.status === status);
+      acc[status] = found ? parseInt(found.count) : 0;
       return acc;
     }, {});
-    
-    // Task status breakdown
+
+    // Task status breakdown (ensure all statuses are present)
+    const allTaskStatuses = ['todo', 'in_progress', 'review', 'completed'];
     const taskStatuses = await Task.findAll({
       attributes: [
         'status',
@@ -51,25 +53,28 @@ router.get('/stats', auth, async (req, res) => {
       group: ['status'],
       raw: true
     });
-    
-    stats.tasksByStatus = taskStatuses.reduce((acc, item) => {
-      acc[item.status] = parseInt(item.count);
+    stats.tasksByStatus = allTaskStatuses.reduce((acc, status) => {
+      const found = taskStatuses.find(item => item.status === status);
+      acc[status] = found ? parseInt(found.count) : 0;
       return acc;
     }, {});
-    
+
     // Compute time tracking metrics
     stats.totalHours = (await TimeEntry.sum('hours', { where: dateFilter })) || 0;
     stats.totalTransactions = (await TimeEntry.sum('transactions', { where: dateFilter })) || 0;
 
-    // Active projects count
-    stats.activeProjects = stats.projectsByStatus['active'] || 0;
+    // Active projects count (direct DB query, not from breakdown)
+    stats.activeProjects = await Project.count({ where: { ...dateFilter, status: 'active' } });
 
-    // Completed and pending tasks counts
-    stats.completedTasks = stats.tasksByStatus['completed'] || 0;
-    stats.pendingTasks = (stats.tasksByStatus['todo'] || 0)
-                       + (stats.tasksByStatus['in_progress'] || 0)
-                       + (stats.tasksByStatus['review'] || 0);
-    
+    // Completed and pending tasks counts (direct DB queries)
+    stats.completedTasks = await Task.count({ where: { ...dateFilter, status: 'completed' } });
+    stats.pendingTasks = await Task.count({
+      where: {
+        ...dateFilter,
+        status: ['todo', 'in_progress', 'review']
+      }
+    });
+
     res.json(stats);
   } catch (error) {
     console.error('Dashboard stats error:', error);
