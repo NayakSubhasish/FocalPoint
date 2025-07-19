@@ -8,7 +8,8 @@ const TimeTransactions = () => {
   const [editingId, setEditingId] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [entries, setEntries] = useState([]);
-  const [form, setForm] = useState({ taskId: '', date: '', hours: '', transactions: '', transactionType: '' });
+  const [users, setUsers] = useState([]);
+  const [form, setForm] = useState({ taskId: '', date: '', hours: '', transactions: '', transactionType: '', userId: '' });
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
 
   useEffect(() => {
@@ -37,8 +38,20 @@ const TimeTransactions = () => {
         console.error(err);
       }
     };
+    // fetch users for admin/pm
+    const fetchUsers = async () => {
+      if (user.role === 'admin' || user.role === 'project_manager') {
+        try {
+          const res = await fetch(`${process.env.REACT_APP_API_URL}/users`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+          if (!res.ok) throw new Error('Failed to fetch users');
+          const data = await res.json();
+          setUsers(data);
+        } catch (err) { console.error(err); }
+      }
+    };
     fetchTasks();
     fetchEntries();
+    fetchUsers();
   }, [user]);
 
   const handleChange = (e) => {
@@ -53,6 +66,7 @@ const TimeTransactions = () => {
       hours: entry.hours,
       transactions: entry.transactions,
       transactionType: entry.transactionType,
+      userId: entry.user?.id || '',
     });
     setEditingId(entry.id);
   };
@@ -84,7 +98,7 @@ const TimeTransactions = () => {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify({ ...form }),
+        body: JSON.stringify({ ...form, userId: (user.role === 'admin' || user.role === 'project_manager') ? form.userId : undefined }),
       });
       console.log('Response status:', res.status, 'OK:', res.ok);
       if (!res.ok) throw new Error('Failed to save entry');
@@ -92,7 +106,7 @@ const TimeTransactions = () => {
       console.log('Response data:', data);
       // Update entries list
       setEntries((prev) => [data, ...prev.filter((e) => e.id !== data.id)]);
-      setForm({ taskId: '', date: '', hours: '', transactions: '', transactionType: '' });
+      setForm({ taskId: '', date: '', hours: '', transactions: '', transactionType: '', userId: '' });
       setEditingId(null);
       setSnackbar({ open: true, message: 'Entry saved' });
     } catch (err) {
@@ -105,6 +119,15 @@ const TimeTransactions = () => {
     <Box p={3}>
       <Typography variant="h5" mb={2}>Time & Transactions</Typography>
       <Box display="flex" gap={2} flexWrap="wrap" mb={3}>
+        {(user.role === 'admin' || user.role === 'project_manager') && (
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Employee</InputLabel>
+            <Select name="userId" value={form.userId} label="Employee" onChange={handleChange}>
+              <MenuItem value=""><em>Select employee</em></MenuItem>
+              {users.map(u => (<MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>))}
+            </Select>
+          </FormControl>
+        )}
         <FormControl size="small" sx={{ minWidth: 200 }}>
           <InputLabel>Task</InputLabel>
           <Select name="taskId" value={form.taskId} label="Task" onChange={handleChange}>
@@ -129,12 +152,14 @@ const TimeTransactions = () => {
         <Table size="small">
           <TableHead>
             <TableRow>
+              {(user.role === 'admin' || user.role === 'project_manager' || user.role === 'team_leader') && <TableCell>Employee</TableCell>}
               <TableCell>Date</TableCell><TableCell>Task</TableCell><TableCell>Hours</TableCell><TableCell>Transactions</TableCell><TableCell>Type</TableCell><TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {entries.map((e) => (
               <TableRow key={e.id}>
+                {(user.role === 'admin' || user.role === 'project_manager' || user.role === 'team_leader') && <TableCell>{e.user?.name}</TableCell>}
                 <TableCell>{e.date}</TableCell>
                 <TableCell>{e.task?.title}</TableCell>
                 <TableCell>{e.hours}</TableCell>

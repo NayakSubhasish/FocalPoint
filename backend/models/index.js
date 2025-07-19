@@ -30,6 +30,7 @@ db.Project = require('./Project')(sequelize, Sequelize);
 db.ProjectTeam = require('./ProjectTeam')(sequelize, Sequelize);
 db.Task = require('./Task')(sequelize, Sequelize);
 db.TimeEntry = require('./TimeEntry')(sequelize, Sequelize);
+db.TaskAssignee = require('./TaskAssignee')(sequelize, Sequelize);
 
 // Set up associations
 Object.keys(db).forEach((modelName) => {
@@ -43,30 +44,56 @@ const adminSeeder = require('../seeders/adminSeeder');
 
 // Run database sync and seed only in development
 if (process.env.NODE_ENV !== 'production') {
-  console.log('Environment is development: syncing database...');
-  sequelize.sync()
-  .then(async () => {
-    console.log('Database synced successfully');
+  (async () => {
     try {
-      // Check if admin exists
-      const adminExists = await db.User.findOne({ where: { email: 'admin@project.com' } });
-      if (!adminExists) {
-        await adminSeeder.up(db.sequelize.getQueryInterface(), Sequelize);
-        console.log('Admin user created successfully');
+      console.log('Environment is development: preparing database...');
+      const qi = sequelize.getQueryInterface();
+      // If Tasks table exists and lacks ownerId, add the column first so that later sync doesn't fail on index creation
+      try {
+        const taskDesc = await qi.describeTable('Tasks');
+        if (!taskDesc.ownerId) {
+          console.log('Adding missing ownerId column to Tasks table...');
+          await qi.addColumn('Tasks', 'ownerId', {
+            type: Sequelize.INTEGER,
+            allowNull: true,
+            references: {
+              model: 'Users',
+              key: 'id',
+            },
+          });
+          console.log('ownerId column added successfully');
+        }
+      } catch (tblErr) {
+        if (tblErr.original && tblErr.original.number === 208) {
+          // Table does not exist yet (fresh DB); ignore
+        } else {
+          console.warn('Could not inspect Tasks table:', tblErr.message);
+        }
       }
-    } catch (error) {
-      console.error('Error running seeders:', error);
-    }
-  })
-  .catch((err) => {
-    console.error('Error syncing database:', err);
+
+      await sequelize.sync();
+      console.log('Database synced successfully');
+
+      // Seed admin user if needed
+      try {
+        const adminExists = await db.User.findOne({ where: { email: 'admin@project.com' } });
+        if (!adminExists) {
+          await adminSeeder.up(qi, Sequelize);
+          console.log('Admin user created successfully');
+        }
+      } catch (seedErr) {
+        console.error('Error running seeders:', seedErr);
+      }
+    } catch (err) {
+      console.error('Error syncing database:', err);
       if (err.parent) {
         console.error('Database error details:', err.parent.message);
       }
       if (err.original) {
         console.error('Original error object:', err.original);
       }
-    });
+    }
+  })();
 } else {
   console.log('Production environment detected: skipping database sync. Ensure the DB schema is already created.');
 }

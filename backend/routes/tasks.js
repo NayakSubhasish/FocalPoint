@@ -1,6 +1,7 @@
 const express = require('express');
 const { Task, Project, User } = require('../models');
 const { auth, authorize } = require('../middleware/auth');
+const { Op } = require('sequelize');
 
 const router = express.Router();
 
@@ -12,6 +13,17 @@ router.get('/', auth, authorize(['admin', 'project_manager', 'team_leader']), as
         {
           model: Project,
           attributes: ['id', 'name'],
+        },
+        {
+          model: User,
+          as: 'owner',
+          attributes: ['id', 'name', 'email'],
+        },
+        {
+          model: User,
+          as: 'assignees',
+          attributes: ['id', 'name', 'email'],
+          through: { attributes: [] },
         },
         {
           model: User,
@@ -35,6 +47,17 @@ router.get('/project/:projectId', auth, async (req, res) => {
       include: [
         {
           model: User,
+          as: 'owner',
+          attributes: ['id', 'name', 'email'],
+        },
+        {
+          model: User,
+          as: 'assignees',
+          attributes: ['id', 'name', 'email'],
+          through: { attributes: [] },
+        },
+        {
+          model: User,
           as: 'assignee',
           attributes: ['id', 'name', 'email'],
         },
@@ -50,12 +73,23 @@ router.get('/project/:projectId', auth, async (req, res) => {
 // Get tasks assigned to current user
 router.get('/my-tasks', auth, async (req, res) => {
   try {
+    // First fetch tasks that may be relevant
     const tasks = await Task.findAll({
-      where: { assignedTo: req.user.id },
       include: [
         {
           model: Project,
           attributes: ['id', 'name'],
+        },
+        {
+          model: User,
+          as: 'owner',
+          attributes: ['id', 'name', 'email'],
+        },
+        {
+          model: User,
+          as: 'assignees',
+          attributes: ['id', 'name', 'email'],
+          through: { attributes: [] },
         },
         {
           model: User,
@@ -64,7 +98,10 @@ router.get('/my-tasks', auth, async (req, res) => {
         },
       ],
     });
-    res.json(tasks);
+
+    // Filter tasks that have the current user either as primary assignee or in assignees list
+    const userTasks = tasks.filter(task => task.assignedTo === req.user.id || (task.assignees && task.assignees.some(u => u.id === req.user.id)));
+    res.json(userTasks);
   } catch (error) {
     console.error('Get my tasks error:', error);
     res.status(500).json({ message: 'Error fetching your tasks.' });
@@ -78,19 +115,24 @@ router.post('/', auth, authorize(['admin', 'project_manager', 'team_leader']), a
       title,
       description,
       projectId,
-      assignedTo,
+      assignedTo, // Expect an array of userIds
       priority,
       estimatedHours,
       estimatedTransactions,
       transactionType,
       deadline,
+      ownerId, // optional only used by admin/pm
     } = req.body;
+
+    const assigneeIds = Array.isArray(assignedTo) ? assignedTo : (assignedTo ? [assignedTo] : []);
+    const primaryAssigneeId = assigneeIds.length ? assigneeIds[0] : null;
 
     const task = await Task.create({
       title,
       description,
       projectId,
-      assignedTo: assignedTo || null,
+      assignedTo: primaryAssigneeId,
+      ownerId: req.user.id,
       priority,
       estimatedHours,
       estimatedTransactions,
@@ -98,11 +140,26 @@ router.post('/', auth, authorize(['admin', 'project_manager', 'team_leader']), a
       deadline,
     });
 
+    if (assigneeIds.length) {
+      await task.setAssignees(assigneeIds);
+    }
+
     const createdTask = await Task.findByPk(task.id, {
       include: [
         {
           model: Project,
           attributes: ['id', 'name'],
+        },
+        {
+          model: User,
+          as: 'owner',
+          attributes: ['id', 'name', 'email'],
+        },
+        {
+          model: User,
+          as: 'assignees',
+          attributes: ['id', 'name', 'email'],
+          through: { attributes: [] },
         },
         {
           model: User,
@@ -119,7 +176,7 @@ router.post('/', auth, authorize(['admin', 'project_manager', 'team_leader']), a
   }
 });
 
-// Update task (admin, project_manager, and team_leader)
+// Update task (admin, project_manager, team_leader, team_member)
 router.put('/:id', auth, authorize(['admin', 'project_manager', 'team_leader', 'team_member']), async (req, res) => {
   try {
     const { id } = req.params;
@@ -127,13 +184,14 @@ router.put('/:id', auth, authorize(['admin', 'project_manager', 'team_leader', '
       title,
       description,
       projectId,
-      assignedTo,
+      assignedTo, // May be array or single value
       status,
       priority,
       estimatedHours,
       estimatedTransactions,
       transactionType,
       deadline,
+      ownerId, // optional
     } = req.body;
 
     const task = await Task.findByPk(id);
@@ -141,24 +199,50 @@ router.put('/:id', auth, authorize(['admin', 'project_manager', 'team_leader', '
       return res.status(404).json({ message: 'Task not found.' });
     }
 
-    await task.update({
+    const assigneeIds = Array.isArray(assignedTo) ? assignedTo : (assignedTo ? [assignedTo] : []);
+    const primaryAssigneeId = assigneeIds.length ? assigneeIds[0] : null;
+
+    const updates = {
       title,
       description,
       projectId,
-      assignedTo: assignedTo || null,
+      assignedTo: primaryAssigneeId,
       status,
       priority,
       estimatedHours,
       estimatedTransactions,
       transactionType,
       deadline,
-    });
+    };
+
+    if (typeof ownerId !== 'undefined') {
+      if (!['admin','project_manager'].includes(req.user.role)) {
+        return res.status(403).json({ message: 'Not authorized to change task owner.' });
+      }
+      updates.ownerId = ownerId;
+    }
+
+    await task.update(updates);
+
+    // Update many-to-many relationship
+    await task.setAssignees(assigneeIds);
 
     const updatedTask = await Task.findByPk(id, {
       include: [
         {
           model: Project,
           attributes: ['id', 'name'],
+        },
+        {
+          model: User,
+          as: 'owner',
+          attributes: ['id', 'name', 'email'],
+        },
+        {
+          model: User,
+          as: 'assignees',
+          attributes: ['id', 'name', 'email'],
+          through: { attributes: [] },
         },
         {
           model: User,

@@ -52,6 +52,13 @@ module.exports = (sequelize, Sequelize) => {
     deadline: {
       type: DataTypes.DATE,
     },
+    ownerId: {
+      type: DataTypes.INTEGER,
+      references: {
+        model: 'Users',
+        key: 'id',
+      },
+    },
   }, {
     indexes: [
       {
@@ -59,6 +66,9 @@ module.exports = (sequelize, Sequelize) => {
       },
       {
         fields: ['assignedTo'],
+      },
+      {
+        fields: ['ownerId'],
       },
     ],
   });
@@ -73,6 +83,36 @@ module.exports = (sequelize, Sequelize) => {
       foreignKey: 'assignedTo',
       as: 'assignee',
     });
+
+    Task.belongsTo(models.User, {
+      foreignKey: 'ownerId',
+      as: 'owner',
+    });
+
+    Task.belongsToMany(models.User, {
+      through: models.TaskAssignee,
+      foreignKey: 'taskId',
+      otherKey: 'userId',
+      as: 'assignees',
+    });
+
+    // Ensure the reverse association exists
+    if (models.User && !models.User.associations?.tasksAssigned) {
+      models.User.belongsToMany(models.Task, {
+        through: models.TaskAssignee,
+        foreignKey: 'userId',
+        otherKey: 'taskId',
+        as: 'tasksAssigned',
+      });
+    }
+
+    // Owner reverse association
+    if (models.User && !models.User.associations?.tasksOwned) {
+      models.User.hasMany(models.Task, {
+        foreignKey: 'ownerId',
+        as: 'tasksOwned',
+      });
+    }
   };
 
   return Task;

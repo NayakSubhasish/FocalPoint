@@ -70,6 +70,23 @@ module.exports = (sequelize) => {
     return isMatch;
   };
 
+  // Define associations
+  User.associate = (models) => {
+    User.belongsToMany(models.Task, {
+      through: models.TaskAssignee,
+      foreignKey: 'userId',
+      otherKey: 'taskId',
+      as: 'tasksAssigned',
+    });
+
+    if (!User.associations?.tasksOwned) {
+      User.hasMany(models.Task, {
+        foreignKey: 'ownerId',
+        as: 'tasksOwned',
+      });
+    }
+  };
+
   return User;
 }; 
 

@@ -28,6 +28,8 @@ import {
   TableSortLabel,
   Skeleton,
   Snackbar,
+  Checkbox,
+  ListItemText,
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
@@ -55,7 +57,8 @@ const TaskManagement = () => {
     title: '',
     description: '',
     projectId: '',
-    assignedTo: '',
+    assignedTo: [],
+    ownerId: '',
     status: 'todo',
     priority: 'medium',
     estimatedHours: '',
@@ -137,7 +140,8 @@ const TaskManagement = () => {
         title: task.title,
         description: task.description || '',
         projectId: task.projectId || '',
-        assignedTo: task.assignedTo || '',
+        assignedTo: task.assignees ? task.assignees.map(a => a.id) : [],
+        ownerId: task.owner?.id || '',
         status: task.status || 'todo',
         priority: task.priority || 'medium',
         estimatedHours: task.estimatedHours || '',
@@ -151,7 +155,8 @@ const TaskManagement = () => {
         title: '',
         description: '',
         projectId: '',
-        assignedTo: '',
+        assignedTo: [],
+        ownerId: user.id,
         status: 'todo',
         priority: 'medium',
         estimatedHours: '',
@@ -191,7 +196,8 @@ const TaskManagement = () => {
           estimatedHours: parseFloat(formData.estimatedHours) || 0,
           estimatedTransactions: parseInt(formData.estimatedTransactions) || 0,
           transactionType: formData.transactionType,
-          assignedTo: formData.assignedTo || null,
+          assignedTo: formData.assignedTo,
+          ownerId: (user.role === 'admin' || user.role === 'project_manager') ? formData.ownerId : undefined,
         }),
       });
       
@@ -215,10 +221,21 @@ const TaskManagement = () => {
   };
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+    // MUI multi-select returns string[] or number[]
+    if (name === 'assignedTo') {
+      setFormData({
+        ...formData,
+        assignedTo: typeof value === 'string' ? value.split(',') : value,
+      });
+    } else if (name === 'ownerId') {
+      setFormData({ ...formData, ownerId: value });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value,
+      });
+    }
   };
 
   const handleClose = () => {
@@ -230,7 +247,8 @@ const TaskManagement = () => {
       title: '',
       description: '',
       projectId: '',
-      assignedTo: '',
+      assignedTo: [],
+      ownerId: user.id,
       status: 'todo',
       priority: 'medium',
       estimatedHours: '',
@@ -384,6 +402,7 @@ const TaskManagement = () => {
                 <TableSortLabel active={orderBy === 'title'} direction={orderBy === 'title' ? order : 'asc'} onClick={() => handleSort('title')}>Title</TableSortLabel>
               </TableCell>
               <TableCell>Project</TableCell>
+              <TableCell>Task Owner</TableCell>
               <TableCell>Assigned To</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Priority</TableCell>
@@ -396,7 +415,7 @@ const TaskManagement = () => {
             {loadingTasks
               ? Array.from({ length: rowsPerPage }).map((_, idx) => (
                   <TableRow key={idx}>
-                    {[...Array(8)].map((__, c) => <TableCell key={c}><Skeleton /></TableCell>)}
+                    {[...Array(9)].map((__, c) => <TableCell key={c}><Skeleton /></TableCell>)}
                   </TableRow>
                 ))
               : stableSort(
@@ -408,7 +427,12 @@ const TaskManagement = () => {
                     <TableRow key={task.id}>
                       <TableCell>{task.title}</TableCell>
                       <TableCell>{task.Project?.name || 'No Project'}</TableCell>
-                      <TableCell>{task.assignee?.name || 'Unassigned'}</TableCell>
+                      <TableCell>{task.owner?.name || 'Unknown'}</TableCell>
+                      <TableCell>
+                        {task.assignees && task.assignees.length
+                          ? task.assignees.map(u => u.name).join(', ')
+                          : task.assignee?.name || 'Unassigned'}
+                      </TableCell>
                       <TableCell>
                         <Chip 
                           label={task.status.replace('_', ' ')} 
@@ -499,20 +523,38 @@ const TaskManagement = () => {
               ))}
             </Select>
           </FormControl>
+          {(user.role === 'admin' || user.role === 'project_manager') && (
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Owner</InputLabel>
+              <Select
+                name="ownerId"
+                value={formData.ownerId}
+                onChange={handleChange}
+                label="Owner"
+              >
+                {users.map((u) => (
+                  <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
           <FormControl fullWidth margin="normal">
-            <InputLabel>Assigned To</InputLabel>
+            <InputLabel>Assignees</InputLabel>
             <Select
+              multiple
               name="assignedTo"
               value={formData.assignedTo}
               onChange={handleChange}
-              label="Assigned To"
+              label="Assignees"
+              renderValue={(selected) => {
+                const selectedUsers = users.filter(u => selected.includes(u.id));
+                return selectedUsers.map(u => u.name).join(', ');
+              }}
             >
-              <MenuItem value="">
-                <em>Unassigned</em>
-              </MenuItem>
               {users.map((user) => (
                 <MenuItem key={user.id} value={user.id}>
-                  {user.name}
+                  <Checkbox checked={formData.assignedTo.indexOf(user.id) > -1} />
+                  <ListItemText primary={user.name} />
                 </MenuItem>
               ))}
             </Select>
