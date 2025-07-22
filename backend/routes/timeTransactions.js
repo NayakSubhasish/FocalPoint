@@ -1,5 +1,5 @@
 const express = require('express');
-const { TimeEntry, Task, User, ProjectTeam } = require('../models');
+const { TimeEntry, Task, User, Project, ProjectTeam } = require('../models');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -28,7 +28,12 @@ router.get('/', auth, async (req, res) => {
     const entries = await TimeEntry.findAll({
       where,
       include: [
-        { model: Task, as: 'task', attributes: ['id', 'title'] },
+        { 
+          model: Task, 
+          as: 'task', 
+          attributes: ['id', 'title', 'projectId'],
+          include: [{ model: Project, attributes: ['id', 'name', 'description'] }],
+        },
         { model: User, as: 'user', attributes: ['id', 'name'] },
       ],
       order: [['date', 'DESC']],
@@ -44,15 +49,15 @@ router.get('/', auth, async (req, res) => {
 router.post('/', auth, async (req, res) => {
   console.log('TimeTransactions POST body:', req.body);
   try {
-    const { taskId, hours, transactions, transactionType, date, userId: bodyUserId } = req.body;
+    const { taskId, hours, transactions, transactionType, date, fileName } = req.body;
     if (!taskId) {
       return res.status(400).json({ message: 'taskId is required.' });
     }
 
     // allow admin / project_manager to create entry for another user
     let entryUserId = req.user.id;
-    if (['admin', 'project_manager'].includes(req.user.role) && bodyUserId) {
-      entryUserId = bodyUserId;
+    if (['admin', 'project_manager'].includes(req.user.role) && req.body.userId) {
+      entryUserId = req.body.userId;
     }
 
     const entry = await TimeEntry.create({
@@ -62,11 +67,12 @@ router.post('/', auth, async (req, res) => {
       transactions: transactions || 0,
       transactionType,
       date: date || new Date(),
+      fileName,
     });
     console.log('Created TimeEntry:', entry.toJSON());
     const fullEntry = await TimeEntry.findByPk(entry.id, {
       include: [
-        { model: Task, as: 'task', attributes: ['id', 'title'] },
+        { model: Task, as: 'task', attributes: ['id', 'title', 'projectId'], include: [{ model: Project, attributes: ['id', 'name', 'description'] }] },
         { model: User, as: 'user', attributes: ['id', 'name'] },
       ],
     });
@@ -99,17 +105,17 @@ router.put('/:id', auth, async (req, res) => {
       if (entry.userId === userId) allowed = true;
     }
     if (!allowed) return res.status(403).json({ message: 'Forbidden' });
-    const { taskId, hours, transactions, transactionType, date, userId: bodyUserId } = req.body;
+    const { taskId, hours, transactions, transactionType, date, fileName, userId: bodyUserId } = req.body;
 
     let newUserId = entry.userId;
     if (typeof bodyUserId !== 'undefined' && ['admin', 'project_manager'].includes(req.user.role)) {
       newUserId = bodyUserId;
     }
 
-    await entry.update({ taskId, hours, transactions, transactionType, date, userId: newUserId });
+    await entry.update({ taskId, hours, transactions, transactionType, date, fileName, userId: newUserId });
     const updated = await TimeEntry.findByPk(req.params.id, {
       include: [
-        { model: Task, as: 'task', attributes: ['id', 'title'] },
+        { model: Task, as: 'task', attributes: ['id', 'title', 'projectId'], include: [{ model: Project, attributes: ['id', 'name', 'description'] }] },
         { model: User, as: 'user', attributes: ['id', 'name'] },
       ],
     });
@@ -145,6 +151,71 @@ router.delete('/:id', auth, async (req, res) => {
   } catch (error) {
     console.error('Delete time entry error:', error);
     res.status(500).json({ message: 'Error deleting time entry.' });
+  }
+});
+
+// ✅ Bulk import time entries
+router.post('/bulk', auth, async (req, res) => {
+  try {
+    const { entries } = req.body;
+    if (!Array.isArray(entries) || !entries.length) {
+      return res.status(400).json({ message: 'entries array required' });
+    }
+
+    const role = req.user.role;
+    const userId = req.user.id;
+
+    const toInsert = [];
+    for (const eRaw of entries) {
+      // Normalize keys ignoring case & whitespace (headers processed by frontend transformHeader)
+      const e = Object.fromEntries(Object.entries(eRaw).map(([k,v])=>[k.toString().trim().toLowerCase(), v]));
+
+      let { taskid, date, hours = 0, transactions = 0, transactiontype, userid: entryUserId, filename } = e;
+
+      // Fallbacks if taskid missing: look for client/project + tasktype
+      if (!taskid) {
+        const projectName = e.client || e.project || e.customer;
+        const taskTitle = e.tasktype || e.task || e.title;
+        if (projectName && taskTitle) {
+          const project = await Project.findOne({ where: { name: projectName } });
+          if (project) {
+            const task = await Task.findOne({ where: { title: taskTitle, projectId: project.id } });
+            if (task) taskid = task.id;
+          }
+        }
+      }
+
+      if (!taskid || !date) continue; // still cannot resolve
+
+      // Resolve user
+      let finalUserId = userId;
+      if (['admin', 'project_manager'].includes(role)) {
+        if (entryUserId) {
+          finalUserId = entryUserId;
+        } else if (e.user) {
+          const usr = await User.findOne({ where: { name: e.user } });
+          if (usr) finalUserId = usr.id;
+        }
+      }
+
+      toInsert.push({
+        taskId: taskid,
+        date,
+        hours: parseFloat(hours) || 0,
+        transactions: parseInt(transactions) || 0,
+        transactionType: transactiontype || null,
+        userId: finalUserId,
+        fileName: filename || null,
+      });
+    }
+
+    if (!toInsert.length) return res.status(400).json({ message: 'No valid entries to import' });
+
+    const created = await TimeEntry.bulkCreate(toInsert);
+    res.json({ imported: created.length });
+  } catch (error) {
+    console.error('Bulk import error:', error);
+    res.status(500).json({ message: 'Error importing time entries' });
   }
 });
 

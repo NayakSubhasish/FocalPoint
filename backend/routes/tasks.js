@@ -12,7 +12,7 @@ router.get('/', auth, authorize(['admin', 'project_manager', 'team_leader']), as
       include: [
         {
           model: Project,
-          attributes: ['id', 'name'],
+          attributes: ['id', 'name', 'description', 'status'],
         },
         {
           model: User,
@@ -46,6 +46,10 @@ router.get('/project/:projectId', auth, async (req, res) => {
       where: { projectId: req.params.projectId },
       include: [
         {
+          model: Project,
+          attributes: ['id', 'name', 'description', 'status'],
+        },
+        {
           model: User,
           as: 'owner',
           attributes: ['id', 'name', 'email'],
@@ -78,7 +82,7 @@ router.get('/my-tasks', auth, async (req, res) => {
       include: [
         {
           model: Project,
-          attributes: ['id', 'name'],
+          attributes: ['id', 'name', 'description', 'status'],
         },
         {
           model: User,
@@ -148,7 +152,7 @@ router.post('/', auth, authorize(['admin', 'project_manager', 'team_leader']), a
       include: [
         {
           model: Project,
-          attributes: ['id', 'name'],
+          attributes: ['id', 'name', 'description', 'status'],
         },
         {
           model: User,
@@ -231,7 +235,7 @@ router.put('/:id', auth, authorize(['admin', 'project_manager', 'team_leader', '
       include: [
         {
           model: Project,
-          attributes: ['id', 'name'],
+          attributes: ['id', 'name', 'description', 'status'],
         },
         {
           model: User,

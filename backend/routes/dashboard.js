@@ -63,7 +63,8 @@ router.get('/stats', auth, async (req, res) => {
     }, {});
 
     // Time & Transactions
-    stats.totalHours = (await TimeEntry.sum('hours', { where: dateFilter })) || 0;
+    const hoursSum = await TimeEntry.sum('hours', { where: dateFilter });
+    stats.totalHours = hoursSum ? parseFloat(hoursSum.toFixed(2)) : 0;
     stats.totalTransactions = (await TimeEntry.sum('transactions', { where: dateFilter })) || 0;
 
     // Direct counts
@@ -208,18 +209,31 @@ router.get('/reports/transactions-by-task', auth, async (req, res) => {
 router.get('/reports/user-workload', auth, async (req, res) => {
   try {
     const dateFilter = getDateFilter(req.query);
+
     const data = await Task.findAll({
-      attributes: ['assignedTo', [sequelize.fn('COUNT', sequelize.col('assignedTo')), 'count']],
-      where: { ...dateFilter, assignedTo: { [Op.ne]: null } },
-      include: [{ model: User, as: 'assignee', attributes: ['name'] }],
-      group: ['assignedTo', 'assignee.name'],
+      attributes: [
+        [sequelize.col('assignees.id'), 'userId'],
+        [sequelize.fn('COUNT', sequelize.col('Task.id')), 'count']
+      ],
+      where: dateFilter,
+      include: [
+        {
+          model: User,
+          as: 'assignees',
+          attributes: ['name'],
+          through: { attributes: [] }
+        }
+      ],
+      group: ['assignees.id', 'assignees.name'],
       raw: true
     });
 
-    res.json(data.map(item => ({
-      user: item['assignee.name'],
-      count: parseInt(item.count)
-    })));
+    res.json(
+      data.map((item) => ({
+        user: item['assignees.name'],
+        count: parseInt(item.count, 10)
+      }))
+    );
   } catch (error) {
     console.error('User workload report error:', error);
     res.status(500).json({ message: 'Error fetching user workload' });
@@ -248,6 +262,27 @@ router.get('/series/tasks-over-time', auth, async (req, res) => {
   } catch (error) {
     console.error('Tasks over time report error:', error);
     res.status(500).json({ message: 'Error fetching tasks over time' });
+  }
+});
+
+// ✅ Projects by Status Report
+router.get('/reports/projects-by-status', auth, async (req, res) => {
+  try {
+    const dateFilter = getDateFilter(req.query);
+    const data = await Project.findAll({
+      attributes: ['status', [sequelize.fn('COUNT', sequelize.col('status')), 'count']],
+      where: dateFilter,
+      group: ['status'],
+      raw: true
+    });
+
+    res.json(data.map(item => ({
+      status: item.status,
+      count: parseInt(item.count)
+    })));
+  } catch (error) {
+    console.error('Projects by status report error:', error);
+    res.status(500).json({ message: 'Error fetching projects by status' });
   }
 });
 

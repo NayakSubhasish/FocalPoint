@@ -38,6 +38,7 @@ const statLabels = [
 ];
 
 const reportList = [
+  { key: 'projectsByStatus', label: 'Projects by Status' },
   { key: 'tasksByStatus', label: 'Tasks by Status' },
   { key: 'tasksByPriority', label: 'Tasks by Priority' },
   { key: 'transactionsByTask', label: 'Transactions per Task' },
@@ -46,6 +47,7 @@ const reportList = [
 
 // Mapping of report keys to API endpoints and table keys
 const reportConfig = {
+  projectsByStatus: { endpoint: 'projects-by-status', labelKey: 'status', valueKey: 'count', title: 'Projects by Status' },
   tasksByStatus: { endpoint: 'tasks-by-status', labelKey: 'status', valueKey: 'count', title: 'Tasks by Status' },
   tasksByPriority: { endpoint: 'tasks-by-priority', labelKey: 'priority', valueKey: 'count', title: 'Tasks by Priority' },
   transactionsByTask: { endpoint: 'transactions-by-task', labelKey: 'title', valueKey: 'transactions', title: 'Transactions per Task' },
@@ -248,7 +250,7 @@ const Dashboard = () => {
           <Typography variant="h6" mb={2}>{reportConfig[selectedReport].title}</Typography>
           <Box width="100%" height={300}>
             <ResponsiveContainer>
-              {selectedReport === 'tasksByStatus' ? (
+              {['tasksByStatus','projectsByStatus'].includes(selectedReport) ? (
                 <PieChart animationDuration={500}>
                   <Pie
                     data={reportData}

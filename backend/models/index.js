@@ -71,6 +71,14 @@ if (process.env.NODE_ENV !== 'production') {
         }
       }
 
+      // If TimeEntries table lacks fileName column, add it
+      const timeEntryDesc = await qi.describeTable('TimeEntries');
+      if (!timeEntryDesc.fileName) {
+        console.log('Adding missing fileName column to TimeEntries table...');
+        await qi.addColumn('TimeEntries', 'fileName', { type: Sequelize.STRING, allowNull: true });
+        console.log('fileName column added successfully');
+      }
+
       await sequelize.sync();
       console.log('Database synced successfully');
 

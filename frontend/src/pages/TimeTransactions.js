@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, TextField, FormControl, InputLabel, Select, MenuItem, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Snackbar, IconButton } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 import { Close as CloseIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import Papa from 'papaparse';
 
 const TimeTransactions = () => {
   const { user } = useAuth();
@@ -9,7 +10,7 @@ const TimeTransactions = () => {
   const [tasks, setTasks] = useState([]);
   const [entries, setEntries] = useState([]);
   const [users, setUsers] = useState([]);
-  const [form, setForm] = useState({ taskId: '', date: '', hours: '', transactions: '', transactionType: '', userId: '' });
+  const [form, setForm] = useState({ taskId: '', date: '', hours: '', transactions: '', transactionType: '', fileName: '', userId: '' });
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
 
   useEffect(() => {
@@ -66,6 +67,7 @@ const TimeTransactions = () => {
       hours: entry.hours,
       transactions: entry.transactions,
       transactionType: entry.transactionType,
+      fileName: entry.fileName || '',
       userId: entry.user?.id || '',
     });
     setEditingId(entry.id);
@@ -106,13 +108,51 @@ const TimeTransactions = () => {
       console.log('Response data:', data);
       // Update entries list
       setEntries((prev) => [data, ...prev.filter((e) => e.id !== data.id)]);
-      setForm({ taskId: '', date: '', hours: '', transactions: '', transactionType: '', userId: '' });
+      setForm({ taskId: '', date: '', hours: '', transactions: '', transactionType: '', fileName: '', userId: '' });
       setEditingId(null);
       setSnackbar({ open: true, message: 'Entry saved' });
     } catch (err) {
       console.error(err);
       setSnackbar({ open: true, message: err.message });
     }
+  };
+
+  const handleCsvImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (h) => h.trim().toLowerCase().replace(/\s+/g,''),
+      dynamicTyping: {
+        hours: true,
+        transactions: true,
+      },
+      complete: async (results) => {
+        try {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`${process.env.REACT_APP_API_URL}/time-transactions/bulk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ entries: results.data }),
+          });
+          if (!res.ok) throw new Error('Bulk import failed');
+          const { imported } = await res.json();
+          setSnackbar({ open: true, message: `${imported} entries imported` });
+          // refresh list
+          const refreshed = await fetch(`${process.env.REACT_APP_API_URL}/time-transactions`, { headers: { Authorization: token } });
+          const data = await refreshed.json();
+          setEntries(data);
+        } catch (err) {
+          console.error(err);
+          setSnackbar({ open: true, message: err.message });
+        }
+      },
+      error: (err) => {
+        console.error(err);
+        setSnackbar({ open: true, message: 'CSV parse error' });
+      }
+    });
   };
 
   return (
@@ -128,15 +168,16 @@ const TimeTransactions = () => {
             </Select>
           </FormControl>
         )}
-        <FormControl size="small" sx={{ minWidth: 200 }}>
+        <FormControl size="small" sx={{ minWidth: 240 }}>
           <InputLabel>Task</InputLabel>
           <Select name="taskId" value={form.taskId} label="Task" onChange={handleChange}>
             <MenuItem value=""><em>Select task</em></MenuItem>
-            {tasks.map(t => (<MenuItem key={t.id} value={t.id}>{t.title}</MenuItem>))}
+            {tasks.map(t => (<MenuItem key={t.id} value={t.id}>{t.title} ({t.Project?.name})</MenuItem>))}
           </Select>
         </FormControl>
         <TextField name="date" label="Date" type="date" size="small" InputLabelProps={{ shrink: true }} value={form.date} onChange={handleChange} />
         <TextField name="hours" label="Hours" type="number" size="small" value={form.hours} onChange={handleChange} />
+        <TextField name="fileName" label="File Name / Description" size="small" value={form.fileName} onChange={handleChange} />
         <TextField name="transactions" label="Transactions" type="number" size="small" value={form.transactions} onChange={handleChange} />
         <FormControl size="small" sx={{ minWidth: 150 }}>
           <InputLabel>Type</InputLabel>
@@ -147,12 +188,17 @@ const TimeTransactions = () => {
           </Select>
         </FormControl>
         <Button variant="contained" onClick={handleSubmit}>{editingId ? 'Update' : 'Save'}</Button>
+        <Button variant="contained" component="label">Import CSV
+          <input type="file" accept=".csv" hidden onChange={handleCsvImport} />
+        </Button>
       </Box>
       <TableContainer component={Paper}>
         <Table size="small">
           <TableHead>
             <TableRow>
               {(user.role === 'admin' || user.role === 'project_manager' || user.role === 'team_leader') && <TableCell>Employee</TableCell>}
+              <TableCell>Project</TableCell>
+              <TableCell>File Name</TableCell>
               <TableCell>Date</TableCell><TableCell>Task</TableCell><TableCell>Hours</TableCell><TableCell>Transactions</TableCell><TableCell>Type</TableCell><TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -160,6 +206,8 @@ const TimeTransactions = () => {
             {entries.map((e) => (
               <TableRow key={e.id}>
                 {(user.role === 'admin' || user.role === 'project_manager' || user.role === 'team_leader') && <TableCell>{e.user?.name}</TableCell>}
+                <TableCell>{e.task?.Project?.name}</TableCell>
+                <TableCell>{e.fileName}</TableCell>
                 <TableCell>{e.date}</TableCell>
                 <TableCell>{e.task?.title}</TableCell>
                 <TableCell>{e.hours}</TableCell>

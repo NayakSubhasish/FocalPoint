@@ -68,7 +68,6 @@ const TaskManagement = () => {
   });
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
 
   useEffect(() => {
     if (user) {
@@ -208,14 +207,12 @@ const TaskManagement = () => {
       
       const msg = editId ? 'Task updated successfully!' : 'Task created successfully!';
       setSnackbarMsg(msg);
-      setSnackbarSeverity('success');
       setSnackbarOpen(true);
       handleClose();
       fetchTasks();
     } catch (error) {
       console.error(`Error ${editId ? 'updating' : 'creating'} task:`, error);
       setSnackbarMsg(error.message);
-      setSnackbarSeverity('error');
       setSnackbarOpen(true);
     }
   };
@@ -322,11 +319,6 @@ const TaskManagement = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const handleSearchChange = (e) => {
-    setSearchText(e.target.value);
-    setPage(0);
-  };
-
   const handleSort = (property) => {
     const isAsc = orderBy === property && order === 'asc';
     setOrder(isAsc ? 'desc' : 'asc');
@@ -402,6 +394,7 @@ const TaskManagement = () => {
                 <TableSortLabel active={orderBy === 'title'} direction={orderBy === 'title' ? order : 'asc'} onClick={() => handleSort('title')}>Title</TableSortLabel>
               </TableCell>
               <TableCell>Project</TableCell>
+              <TableCell>Project Details</TableCell>
               <TableCell>Task Owner</TableCell>
               <TableCell>Assigned To</TableCell>
               <TableCell>Status</TableCell>
@@ -415,7 +408,7 @@ const TaskManagement = () => {
             {loadingTasks
               ? Array.from({ length: rowsPerPage }).map((_, idx) => (
                   <TableRow key={idx}>
-                    {[...Array(9)].map((__, c) => <TableCell key={c}><Skeleton /></TableCell>)}
+                    {[...Array(10)].map((__, c) => <TableCell key={c}><Skeleton /></TableCell>)}
                   </TableRow>
                 ))
               : stableSort(
@@ -427,6 +420,7 @@ const TaskManagement = () => {
                     <TableRow key={task.id}>
                       <TableCell>{task.title}</TableCell>
                       <TableCell>{task.Project?.name || 'No Project'}</TableCell>
+                      <TableCell>{task.Project?.description || ''}</TableCell>
                       <TableCell>{task.owner?.name || 'Unknown'}</TableCell>
                       <TableCell>
                         {task.assignees && task.assignees.length

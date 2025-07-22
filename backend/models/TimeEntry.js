@@ -25,6 +25,10 @@ module.exports = (sequelize, Sequelize) => {
       allowNull: false,
       defaultValue: 0,
     },
+    fileName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     transactionType: {
       type: DataTypes.ENUM('pages', 'images', 'records'),
       allowNull: true,
