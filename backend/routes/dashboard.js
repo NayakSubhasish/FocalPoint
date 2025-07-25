@@ -286,4 +286,73 @@ router.get('/reports/projects-by-status', auth, async (req, res) => {
   }
 });
 
+// Add Project Report endpoint
+router.get('/reports/project-report', auth, async (req, res) => {
+  try {
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+    // Fetch all projects
+    const projects = await Project.findAll({ attributes: ['id', 'name', 'createdAt'], raw: true });
+    const report = await Promise.all(projects.map(async (project) => {
+      const createdAt = new Date(project.createdAt);
+      const projectsReceived = (createdAt >= firstDayOfMonth && createdAt < now) ? 1 : 0;
+
+      // Tasks created today
+      const tasksToday = await Task.count({
+        where: {
+          projectId: project.id,
+          createdAt: { [Op.between]: [todayStart, tomorrowStart] }
+        }
+      });
+
+      // Time entries for this project
+      const recordsLogged = await TimeEntry.count({
+        include: [{ model: Task, as: 'task', where: { projectId: project.id }, attributes: [] }]
+      });
+      const recordsProcessed = await TimeEntry.sum('transactions', {
+        include: [{ model: Task, as: 'task', where: { projectId: project.id }, attributes: [] }]
+      }) || 0;
+      const totalHours = await TimeEntry.sum('hours', {
+        include: [{ model: Task, as: 'task', where: { projectId: project.id }, attributes: [] }]
+      }) || 0;
+      const avgMinutesPerRecord = recordsProcessed > 0
+        ? parseFloat(((totalHours / recordsProcessed) * 60).toFixed(2))
+        : 0;
+
+      // Breakdown per agent
+      const perAgentRaw = await TimeEntry.findAll({
+        attributes: ['userId', [sequelize.fn('COUNT', sequelize.col('TimeEntry.id')), 'count'], [sequelize.fn('SUM', sequelize.col('hours')), 'hours']],
+        include: [
+          { model: Task, as: 'task', where: { projectId: project.id }, attributes: [] },
+          { model: User, as: 'user', attributes: ['name'] }
+        ],
+        group: ['userId', 'user.name'],
+        raw: true
+      });
+      const recordsPerAgent = perAgentRaw.map(item => ({ user: item['user.name'], count: parseInt(item.count, 10) }));
+      const timePerAgent = perAgentRaw.map(item => ({ user: item['user.name'], hours: parseFloat(item.hours) }));
+
+      return {
+        projectName: project.name,
+        projectsReceived,
+        tasksToday,
+        recordsLogged,
+        recordsProcessed,
+        avgMinutesPerRecord,
+        totalHours: parseFloat(totalHours.toFixed(2)),
+        recordsPerAgent,
+        timePerAgent
+      };
+    }));
+
+    res.json(report);
+  } catch (error) {
+    console.error('Project report error:', error);
+    res.status(500).json({ message: 'Error fetching project report' });
+  }
+});
+
 module.exports = router;

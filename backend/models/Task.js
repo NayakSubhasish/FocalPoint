@@ -42,7 +42,7 @@ module.exports = (sequelize, Sequelize) => {
       defaultValue: 0,
     },
     transactionType: {
-      type: DataTypes.ENUM('pages', 'images', 'records'),
+      type: DataTypes.ENUM('pages', 'images', 'records', 'charts'),
       allowNull: true,
     },
     estimatedHours: {

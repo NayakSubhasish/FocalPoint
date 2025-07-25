@@ -209,6 +209,7 @@ const TaskManagement = () => {
       setSnackbarMsg(msg);
       setSnackbarOpen(true);
       handleClose();
+      setPage(0); // reset to first page after task creation
       fetchTasks();
     } catch (error) {
       console.error(`Error ${editId ? 'updating' : 'creating'} task:`, error);
@@ -219,8 +220,15 @@ const TaskManagement = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // MUI multi-select returns string[] or number[]
-    if (name === 'assignedTo') {
+    if (name === 'projectId') {
+      const selectedProject = projects.find(p => p.id === value);
+      setFormData({
+        ...formData,
+        projectId: value,
+        description: selectedProject ? selectedProject.description : '',
+      });
+    } else if (name === 'assignedTo') {
+      // MUI multi-select returns string[] or number[]
       setFormData({
         ...formData,
         assignedTo: typeof value === 'string' ? value.split(',') : value,
@@ -620,6 +628,7 @@ const TaskManagement = () => {
               <MenuItem value='pages'>Pages</MenuItem>
               <MenuItem value='images'>Images</MenuItem>
               <MenuItem value='records'>Records</MenuItem>
+              <MenuItem value='charts'>Charts</MenuItem>
             </Select>
           </FormControl>
         </DialogContent>

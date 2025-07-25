@@ -10,6 +10,13 @@ import {
   useTheme,
   TextField,
   IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
 } from '@mui/material';
 import {
   ResponsiveContainer,
@@ -43,6 +50,7 @@ const reportList = [
   { key: 'tasksByPriority', label: 'Tasks by Priority' },
   { key: 'transactionsByTask', label: 'Transactions per Task' },
   { key: 'userWorkload', label: 'User Workload' },
+  { key: 'projectReport', label: 'Project Overview' }
 ];
 
 // Mapping of report keys to API endpoints and table keys
@@ -52,6 +60,7 @@ const reportConfig = {
   tasksByPriority: { endpoint: 'tasks-by-priority', labelKey: 'priority', valueKey: 'count', title: 'Tasks by Priority' },
   transactionsByTask: { endpoint: 'transactions-by-task', labelKey: 'title', valueKey: 'transactions', title: 'Transactions per Task' },
   userWorkload: { endpoint: 'user-workload', labelKey: 'user', valueKey: 'count', title: 'User Workload' },
+  projectReport: { endpoint: 'project-report', title: 'Project Overview' }
 };
 
 const Dashboard = () => {
@@ -248,43 +257,78 @@ const Dashboard = () => {
       {selectedReport && !loadingReport && !errorReport && (
         <Box mt={4}>
           <Typography variant="h6" mb={2}>{reportConfig[selectedReport].title}</Typography>
-          <Box width="100%" height={300}>
-            <ResponsiveContainer>
-              {['tasksByStatus','projectsByStatus'].includes(selectedReport) ? (
-                <PieChart animationDuration={500}>
-                  <Pie
+          {selectedReport === 'projectReport' ? (
+            <TableContainer component={Paper}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Project</TableCell>
+                    <TableCell>Projects This Month</TableCell>
+                    <TableCell>Tasks Today</TableCell>
+                    <TableCell>Records Logged</TableCell>
+                    <TableCell>Records Processed</TableCell>
+                    <TableCell>Avg Minutes per Record</TableCell>
+                    <TableCell>Total Hours</TableCell>
+                    <TableCell>Records per Agent</TableCell>
+                    <TableCell>Time per Agent</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {reportData.map((row) => (
+                    <TableRow key={row.projectName}>
+                      <TableCell>{row.projectName}</TableCell>
+                      <TableCell>{row.projectsReceived}</TableCell>
+                      <TableCell>{row.tasksToday}</TableCell>
+                      <TableCell>{row.recordsLogged}</TableCell>
+                      <TableCell>{row.recordsProcessed}</TableCell>
+                      <TableCell>{row.avgMinutesPerRecord}</TableCell>
+                      <TableCell>{row.totalHours}</TableCell>
+                      <TableCell>{row.recordsPerAgent.map(a => `${a.user} - ${a.count}`).join(' / ')}</TableCell>
+                      <TableCell>{row.timePerAgent.map(a => `${a.user} - ${a.hours} hrs`).join(' / ')}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          ) : (
+            <Box width="100%" height={300}>
+              <ResponsiveContainer>
+                {['tasksByStatus','projectsByStatus'].includes(selectedReport) ? (
+                  <PieChart animationDuration={500}>
+                    <Pie
+                      data={reportData}
+                      dataKey={reportConfig[selectedReport].valueKey}
+                      nameKey={reportConfig[selectedReport].labelKey}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      labelLine={false}
+                    >
+                      {reportData.map((entry, idx) => (
+                        <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Legend verticalAlign="bottom" height={36} />
+                    <RechartTooltip />
+                  </PieChart>
+                ) : (
+                  <BarChart
                     data={reportData}
-                    dataKey={reportConfig[selectedReport].valueKey}
-                    nameKey={reportConfig[selectedReport].labelKey}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    labelLine={false}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                   >
-                    {reportData.map((entry, idx) => (
-                      <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Legend verticalAlign="bottom" height={36} />
-                  <RechartTooltip />
-                </PieChart>
-              ) : (
-                <BarChart
-                  data={reportData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey={reportConfig[selectedReport].labelKey} />
-                  <YAxis />
-                  <RechartTooltip />
-                  <Legend verticalAlign="bottom" height={36} />
-                  <Bar dataKey={reportConfig[selectedReport].valueKey}>
-                    {reportData.map((entry, idx) => (
-                      <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              )}
-            </ResponsiveContainer>
-          </Box>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey={reportConfig[selectedReport].labelKey} />
+                    <YAxis />
+                    <RechartTooltip />
+                    <Legend verticalAlign="bottom" height={36} />
+                    <Bar dataKey={reportConfig[selectedReport].valueKey}>
+                      {reportData.map((entry, idx) => (
+                        <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            </Box>
+          )}
         </Box>
       )}
     </Box>

@@ -185,6 +185,7 @@ const TimeTransactions = () => {
             <MenuItem value="pages">Pages</MenuItem>
             <MenuItem value="images">Images</MenuItem>
             <MenuItem value="records">Records</MenuItem>
+            <MenuItem value="charts">Charts</MenuItem>
           </Select>
         </FormControl>
         <Button variant="contained" onClick={handleSubmit}>{editingId ? 'Update' : 'Save'}</Button>

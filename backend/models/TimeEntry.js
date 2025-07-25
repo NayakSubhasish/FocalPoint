@@ -30,7 +30,7 @@ module.exports = (sequelize, Sequelize) => {
       allowNull: true,
     },
     transactionType: {
-      type: DataTypes.ENUM('pages', 'images', 'records'),
+      type: DataTypes.ENUM('pages', 'images', 'records', 'charts'),
       allowNull: true,
     },
     date: {
