@@ -355,4 +355,100 @@ router.get('/reports/project-report', auth, async (req, res) => {
   }
 });
 
+// ✅ User Daily Logs Report - time and transactions per user for a given date (defaults to today)
+router.get('/reports/user-daily-logs', auth, async (req, res) => {
+  try {
+    const targetDate = req.query.date && !isNaN(new Date(req.query.date))
+      ? new Date(req.query.date)
+      : new Date();
+
+    const dateStr = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    const data = await TimeEntry.findAll({
+      attributes: [
+        'userId',
+        [sequelize.fn('SUM', sequelize.col('hours')), 'hours'],
+        [sequelize.fn('SUM', sequelize.col('transactions')), 'transactions']
+      ],
+      where: { date: dateStr },
+      include: [
+        { model: User, as: 'user', attributes: ['name'] },
+        {
+          model: Task,
+          as: 'task',
+          attributes: ['title'],
+          include: [{ model: Project, attributes: ['name'] }]
+        }
+      ],
+      group: ['userId', 'user.name', 'task.id', 'task.title', 'task.Project.id', 'task.Project.name'],
+      raw: true
+    });
+
+    res.json(
+      data.map(item => ({
+        user: item['user.name'],
+        project: item['task.Project.name'],
+        task: item['task.title'],
+        hours: parseFloat(parseFloat(item.hours).toFixed(2)),
+        transactions: parseInt(item.transactions, 10)
+      }))
+    );
+  } catch (error) {
+    console.error('User daily logs report error:', error);
+    res.status(500).json({ message: 'Error fetching daily user logs' });
+  }
+});
+
+// ✅ User Monthly Logs Report - aggregated time and transactions per user for the current (or provided) month
+router.get('/reports/user-monthly-logs', auth, async (req, res) => {
+  try {
+    let baseDate = new Date();
+    if (req.query.month && /^\d{4}-\d{2}$/.test(req.query.month)) {
+      // month in YYYY-MM format
+      const [year, month] = req.query.month.split('-').map(Number);
+      baseDate = new Date(year, month - 1, 1);
+    }
+
+    const firstDay = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+    const lastDay = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0); // last day of month
+
+    const data = await TimeEntry.findAll({
+      attributes: [
+        'userId',
+        [sequelize.fn('SUM', sequelize.col('hours')), 'hours'],
+        [sequelize.fn('SUM', sequelize.col('transactions')), 'transactions']
+      ],
+      where: {
+        date: {
+          [Op.between]: [firstDay.toISOString().split('T')[0], lastDay.toISOString().split('T')[0]]
+        }
+      },
+      include: [
+        { model: User, as: 'user', attributes: ['name'] },
+        {
+          model: Task,
+          as: 'task',
+          attributes: ['title'],
+          include: [{ model: Project, attributes: ['name'] }]
+        }
+      ],
+      group: ['userId', 'user.name', 'task.id', 'task.title', 'task.Project.id', 'task.Project.name'],
+      raw: true
+    });
+
+    res.json(
+      data.map(item => ({
+        user: item['user.name'],
+        project: item['task.Project.name'],
+        task: item['task.title'],
+        hours: parseFloat(parseFloat(item.hours).toFixed(2)),
+        transactions: parseInt(item.transactions, 10)
+      }))
+    );
+  } catch (error) {
+    console.error('User monthly logs report error:', error);
+    res.status(500).json({ message: 'Error fetching monthly user logs' });
+  }
+});
+
 module.exports = router;

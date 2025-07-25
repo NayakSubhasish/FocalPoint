@@ -17,6 +17,7 @@ import {
   TableHead,
   TableRow,
   Paper,
+  Chip,
 } from '@mui/material';
 import {
   ResponsiveContainer,
@@ -50,7 +51,9 @@ const reportList = [
   { key: 'tasksByPriority', label: 'Tasks by Priority' },
   { key: 'transactionsByTask', label: 'Transactions per Task' },
   { key: 'userWorkload', label: 'User Workload' },
-  { key: 'projectReport', label: 'Project Overview' }
+  { key: 'projectReport', label: 'Project Overview' },
+  { key: 'dailyUserLogs', label: 'Daily Time Logs' },
+  { key: 'monthlyUserLogs', label: 'Monthly Time Logs' }
 ];
 
 // Mapping of report keys to API endpoints and table keys
@@ -60,7 +63,9 @@ const reportConfig = {
   tasksByPriority: { endpoint: 'tasks-by-priority', labelKey: 'priority', valueKey: 'count', title: 'Tasks by Priority' },
   transactionsByTask: { endpoint: 'transactions-by-task', labelKey: 'title', valueKey: 'transactions', title: 'Transactions per Task' },
   userWorkload: { endpoint: 'user-workload', labelKey: 'user', valueKey: 'count', title: 'User Workload' },
-  projectReport: { endpoint: 'project-report', title: 'Project Overview' }
+  projectReport: { endpoint: 'project-report', title: 'Project Overview' },
+  dailyUserLogs: { endpoint: 'user-daily-logs', title: 'Daily Time Logs' },
+  monthlyUserLogs: { endpoint: 'user-monthly-logs', title: 'Monthly Time Logs' }
 };
 
 const Dashboard = () => {
@@ -86,6 +91,9 @@ const Dashboard = () => {
     "#F15BB5", // Pink
     "#00B8A9", // Aqua
   ];
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [dailyDate, setDailyDate] = useState(todayStr);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -118,14 +126,15 @@ const Dashboard = () => {
   }, [dateRange]);
 
   // Handler for fetching report data
-  const handleReportClick = async (key) => {
+  const fetchReportData = async (key, extraParams = {}) => {
     setSelectedReport(key);
     setLoadingReport(true);
     setErrorReport('');
     try {
       const token = localStorage.getItem('token');
       const { endpoint } = reportConfig[key];
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/dashboard/reports/${endpoint}`, {
+      const urlParams = new URLSearchParams(extraParams).toString();
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/dashboard/reports/${endpoint}?${urlParams}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to fetch report');
@@ -138,15 +147,44 @@ const Dashboard = () => {
     }
   };
 
+  const handleReportClick = (key) => {
+    if (key === 'dailyUserLogs') {
+      fetchReportData(key, { date: dailyDate });
+    } else if (key === 'monthlyUserLogs') {
+      fetchReportData(key); // current month by default
+    } else {
+      fetchReportData(key);
+    }
+  };
+
+  // Refetch daily logs when date changes and daily report is selected
+  useEffect(() => {
+    if (selectedReport === 'dailyUserLogs') {
+      fetchReportData('dailyUserLogs', { date: dailyDate });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dailyDate]);
+
   // Export current report to CSV
   const exportReportCsv = () => {
     if (!selectedReport || !reportData.length) return;
     const { labelKey, valueKey, title } = reportConfig[selectedReport];
-    const headers = [labelKey, valueKey];
-    const csvRows = [headers.join(',')];
-    reportData.forEach(row => {
-      csvRows.push([row[labelKey], row[valueKey]].join(','));
-    });
+    let headers = [];
+    let csvRows = [];
+
+    if (selectedReport === 'dailyUserLogs' || selectedReport === 'monthlyUserLogs') {
+      headers = ['Employee','Project','Task','Hours','Transactions'];
+      csvRows = [headers.join(',')];
+      reportData.forEach((row) => {
+        csvRows.push([row.user, row.project, row.task, row.hours, row.transactions].join(','));
+      });
+    } else {
+      headers = [labelKey, valueKey];
+      csvRows = [headers.join(',')];
+      reportData.forEach(row => {
+        csvRows.push([row[labelKey], row[valueKey]].join(','));
+      });
+    }
     const csvString = csvRows.join('\n');
     const blob = new Blob([csvString], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -258,38 +296,104 @@ const Dashboard = () => {
         <Box mt={4}>
           <Typography variant="h6" mb={2}>{reportConfig[selectedReport].title}</Typography>
           {selectedReport === 'projectReport' ? (
-            <TableContainer component={Paper}>
-              <Table size="small">
+            <TableContainer component={Paper} sx={{ maxHeight: 440, borderRadius: 2, boxShadow: 3 }}>
+              <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Project</TableCell>
-                    <TableCell>Projects This Month</TableCell>
-                    <TableCell>Tasks Today</TableCell>
-                    <TableCell>Records Logged</TableCell>
-                    <TableCell>Records Processed</TableCell>
-                    <TableCell>Avg Minutes per Record</TableCell>
-                    <TableCell>Total Hours</TableCell>
-                    <TableCell>Records per Agent</TableCell>
-                    <TableCell>Time per Agent</TableCell>
+                    {['Project','Projects This Month','Tasks Today','Records Logged','Records Processed','Avg Minutes per Record','Total Hours','Records per Agent','Time per Agent'].map((header) => (
+                      <TableCell
+                        key={header}
+                        sx={{
+                          backgroundColor: theme.palette.mode === 'light' ? theme.palette.grey[200] : theme.palette.grey[800],
+                          fontWeight: 'bold',
+                          whiteSpace: 'nowrap',
+                          position: 'sticky',
+                          top: 0,
+                          zIndex: 1,
+                        }}
+                      >
+                        {header}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {reportData.map((row) => (
-                    <TableRow key={row.projectName}>
-                      <TableCell>{row.projectName}</TableCell>
+                    <TableRow key={row.projectName} hover>
+                      <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 500 }}>{row.projectName}</TableCell>
                       <TableCell>{row.projectsReceived}</TableCell>
                       <TableCell>{row.tasksToday}</TableCell>
                       <TableCell>{row.recordsLogged}</TableCell>
                       <TableCell>{row.recordsProcessed}</TableCell>
                       <TableCell>{row.avgMinutesPerRecord}</TableCell>
                       <TableCell>{row.totalHours}</TableCell>
-                      <TableCell>{row.recordsPerAgent.map(a => `${a.user} - ${a.count}`).join(' / ')}</TableCell>
-                      <TableCell>{row.timePerAgent.map(a => `${a.user} - ${a.hours} hrs`).join(' / ')}</TableCell>
+                      <TableCell>
+                        <Box display="flex" flexWrap="wrap" gap={0.5}>
+                          {row.recordsPerAgent.map((a) => (
+                            <Chip key={a.user} label={`${a.user} - ${a.count}`} size="small" />
+                          ))}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box display="flex" flexWrap="wrap" gap={0.5}>
+                          {row.timePerAgent.map((a) => (
+                            <Chip key={a.user} label={`${a.user} - ${a.hours} hrs`} size="small" />
+                          ))}
+                        </Box>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </TableContainer>
+          ) : selectedReport === 'dailyUserLogs' || selectedReport === 'monthlyUserLogs' ? (
+            <>
+              {selectedReport === 'dailyUserLogs' && (
+                <Box mb={2} display="flex" gap={2}>
+                  <TextField
+                    type="date"
+                    label="Select Date"
+                    size="small"
+                    value={dailyDate}
+                    onChange={(e) => setDailyDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Box>
+              )}
+              <TableContainer component={Paper} sx={{ maxHeight: 440, borderRadius: 2, boxShadow: 3 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      {['Employee','Project','Task','Hours','Transactions'].map((header) => (
+                        <TableCell
+                          key={header}
+                          sx={{
+                            backgroundColor: theme.palette.mode === 'light' ? theme.palette.grey[200] : theme.palette.grey[800],
+                            fontWeight: 'bold',
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 1,
+                          }}
+                        >
+                          {header}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {reportData.map((row) => (
+                      <TableRow key={row.user} hover>
+                        <TableCell sx={{ fontWeight: 500 }}>{row.user}</TableCell>
+                        <TableCell>{row.project}</TableCell>
+                        <TableCell>{row.task}</TableCell>
+                        <TableCell>{row.hours}</TableCell>
+                        <TableCell>{row.transactions}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </>
           ) : (
             <Box width="100%" height={300}>
               <ResponsiveContainer>
