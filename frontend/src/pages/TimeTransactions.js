@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, TextField, FormControl, InputLabel, Select, MenuItem, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Snackbar, IconButton } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
-import { Close as CloseIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Close as CloseIcon, Edit as EditIcon, Delete as DeleteIcon, Download as DownloadIcon } from '@mui/icons-material';
 import Papa from 'papaparse';
 
 const TimeTransactions = () => {
@@ -12,6 +12,40 @@ const TimeTransactions = () => {
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState({ taskId: '', date: '', hours: '', transactions: '', transactionType: '', fileName: '', userId: '' });
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
+  // Export current entries to CSV
+  const handleExportCsv = () => {
+    if (!entries.length) {
+      setSnackbar({ open: true, message: 'No entries to export' });
+      return;
+    }
+
+    const headers = ['Employee','Project','Task','File Name','Date','Hours','Transactions','Type'];
+    const csvRows = [headers.join(',')];
+
+    entries.forEach((e) => {
+      csvRows.push([
+        e.user?.name || '',
+        e.task?.Project?.name || '',
+        e.task?.title || '',
+        e.fileName || '',
+        e.date,
+        e.hours,
+        e.transactions,
+        e.transactionType || ''
+      ].join(','));
+    });
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `time_entries_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     // fetch tasks for selection
@@ -189,6 +223,7 @@ const TimeTransactions = () => {
           </Select>
         </FormControl>
         <Button variant="contained" onClick={handleSubmit}>{editingId ? 'Update' : 'Save'}</Button>
+        <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCsv}>Export CSV</Button>
         <Button variant="contained" component="label">Import CSV
           <input type="file" accept=".csv" hidden onChange={handleCsvImport} />
         </Button>
