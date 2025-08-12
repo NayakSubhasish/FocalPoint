@@ -94,6 +94,10 @@ const Dashboard = () => {
 
   const todayStr = new Date().toISOString().split('T')[0];
   const [dailyDate, setDailyDate] = useState(todayStr);
+  const [monthlyFilter, setMonthlyFilter] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -151,7 +155,7 @@ const Dashboard = () => {
     if (key === 'dailyUserLogs') {
       fetchReportData(key, { date: dailyDate });
     } else if (key === 'monthlyUserLogs') {
-      fetchReportData(key); // current month by default
+      fetchReportData(key, { month: monthlyFilter });
     } else {
       fetchReportData(key);
     }
@@ -164,6 +168,14 @@ const Dashboard = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dailyDate]);
+
+  // Refetch monthly logs when filter changes and monthly report is selected
+  useEffect(() => {
+    if (selectedReport === 'monthlyUserLogs') {
+      fetchReportData('monthlyUserLogs', { month: monthlyFilter });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthlyFilter]);
 
   // Export current report to CSV
   const exportReportCsv = () => {
@@ -356,6 +368,18 @@ const Dashboard = () => {
                     size="small"
                     value={dailyDate}
                     onChange={(e) => setDailyDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Box>
+              )}
+              {selectedReport === 'monthlyUserLogs' && (
+                <Box mb={2} display="flex" gap={2}>
+                  <TextField
+                    type="month"
+                    label="Select Month"
+                    size="small"
+                    value={monthlyFilter}
+                    onChange={(e) => setMonthlyFilter(e.target.value)}
                     InputLabelProps={{ shrink: true }}
                   />
                 </Box>
