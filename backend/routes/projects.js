@@ -34,6 +34,7 @@ router.get('/', auth, authorize(['admin', 'project_manager', 'team_leader', 'tea
           through: { attributes: ['role'] },
         },
       ],
+      order: [['createdAt', 'DESC']],
     });
     console.log('Projects found:', projects.length);
     res.json(projects);

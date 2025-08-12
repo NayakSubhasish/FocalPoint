@@ -181,9 +181,9 @@ const Dashboard = () => {
     } else {
       headers = [labelKey, valueKey];
       csvRows = [headers.join(',')];
-      reportData.forEach(row => {
-        csvRows.push([row[labelKey], row[valueKey]].join(','));
-      });
+    reportData.forEach(row => {
+      csvRows.push([row[labelKey], row[valueKey]].join(','));
+    });
     }
     const csvString = csvRows.join('\n');
     const blob = new Blob([csvString], { type: 'text/csv' });

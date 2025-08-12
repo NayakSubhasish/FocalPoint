@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, TextField, FormControl, InputLabel, Select, MenuItem, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Snackbar, IconButton } from '@mui/material';
+import { Box, Typography, Button, TextField, FormControl, InputLabel, Select, MenuItem, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Snackbar, IconButton, Autocomplete } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 import { Close as CloseIcon, Edit as EditIcon, Delete as DeleteIcon, Download as DownloadIcon } from '@mui/icons-material';
 import Papa from 'papaparse';
@@ -194,21 +194,41 @@ const TimeTransactions = () => {
       <Typography variant="h5" mb={2}>Time & Transactions</Typography>
       <Box display="flex" gap={2} flexWrap="wrap" mb={3}>
         {(user.role === 'admin' || user.role === 'project_manager') && (
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel>Employee</InputLabel>
-            <Select name="userId" value={form.userId} label="Employee" onChange={handleChange}>
-              <MenuItem value=""><em>Select employee</em></MenuItem>
-              {users.map(u => (<MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            size="small"
+            sx={{ minWidth: 180 }}
+            options={users}
+            getOptionLabel={(option) => option.name}
+            value={users.find(u => u.id === form.userId) || null}
+            onChange={(event, newValue) => {
+              setForm({ ...form, userId: newValue ? newValue.id : '' });
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Employee"
+                placeholder="Search for employee..."
+              />
+            )}
+          />
         )}
-        <FormControl size="small" sx={{ minWidth: 240 }}>
-          <InputLabel>Task</InputLabel>
-          <Select name="taskId" value={form.taskId} label="Task" onChange={handleChange}>
-            <MenuItem value=""><em>Select task</em></MenuItem>
-            {tasks.map(t => (<MenuItem key={t.id} value={t.id}>{t.title} ({t.Project?.name})</MenuItem>))}
-          </Select>
-        </FormControl>
+        <Autocomplete
+          size="small"
+          sx={{ minWidth: 240 }}
+          options={tasks}
+          getOptionLabel={(option) => `${option.title} (${option.Project?.name || 'No Project'})`}
+          value={tasks.find(t => t.id === form.taskId) || null}
+          onChange={(event, newValue) => {
+            setForm({ ...form, taskId: newValue ? newValue.id : '' });
+          }}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Task"
+              placeholder="Search for task..."
+            />
+          )}
+        />
         <TextField name="date" label="Date" type="date" size="small" InputLabelProps={{ shrink: true }} value={form.date} onChange={handleChange} />
         <TextField name="hours" label="Hours" type="number" size="small" value={form.hours} onChange={handleChange} />
         <TextField name="fileName" label="File Name / Description" size="small" value={form.fileName} onChange={handleChange} />
@@ -219,7 +239,6 @@ const TimeTransactions = () => {
             <MenuItem value="pages">Pages</MenuItem>
             <MenuItem value="images">Images</MenuItem>
             <MenuItem value="records">Records</MenuItem>
-            <MenuItem value="charts">Charts</MenuItem>
           </Select>
         </FormControl>
         <Button variant="contained" onClick={handleSubmit}>{editingId ? 'Update' : 'Save'}</Button>

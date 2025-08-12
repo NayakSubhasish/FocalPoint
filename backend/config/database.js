@@ -23,7 +23,9 @@ const sequelize = new Sequelize(
     dialectOptions: {
       options: {
         encrypt: false,
-        trustServerCertificate: true
+        trustServerCertificate: true,
+        enableArithAbort: true,
+        requestTimeout: 30000
       }
     },
     pool: {
@@ -32,6 +34,11 @@ const sequelize = new Sequelize(
       acquire: 30000,
       idle: 10000,
     },
+    define: {
+      freezeTableName: true,
+      timestamps: true,
+      underscored: false
+    }
   }
 );
 

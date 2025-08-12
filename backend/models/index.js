@@ -79,8 +79,13 @@ if (process.env.NODE_ENV !== 'production') {
         console.log('fileName column added successfully');
       }
 
-      await sequelize.sync();
-      console.log('Database synced successfully');
+      // Drop existing transactionType CHECK constraints so 'charts' is accepted
+      console.log('Dropping transactionType CHECK constraints if they exist...');
+      await sequelize.query("IF EXISTS (SELECT * FROM sys.check_constraints WHERE name = 'CK_Tasks_TransactionType') ALTER TABLE dbo.Tasks DROP CONSTRAINT CK_Tasks_TransactionType;");
+      await sequelize.query("IF EXISTS (SELECT * FROM sys.check_constraints WHERE name = 'CK_TimeEntry_TransactionType') ALTER TABLE dbo.TimeEntry DROP CONSTRAINT CK_TimeEntry_TransactionType;");
+      // Sync database schema (alter existing tables)
+      await sequelize.sync({ alter: true });
+      console.log('Database synced successfully (with schema alterations)');
 
       // Seed admin user if needed
       try {

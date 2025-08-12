@@ -36,7 +36,7 @@ router.get('/', auth, async (req, res) => {
         },
         { model: User, as: 'user', attributes: ['id', 'name'] },
       ],
-      order: [['date', 'DESC']],
+      order: [['createdAt', 'DESC']],
     });
     res.json(entries);
   } catch (error) {

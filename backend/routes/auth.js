@@ -182,7 +182,8 @@ router.get('/me', auth, async (req, res) => {
 router.get('/users', auth, authorize(['admin']), async (req, res) => {
   try {
     const users = await db.User.findAll({
-      attributes: { exclude: ['password'] }
+      attributes: { exclude: ['password'] },
+      order: [['createdAt', 'DESC']],
     });
     res.json(users);
   } catch (error) {

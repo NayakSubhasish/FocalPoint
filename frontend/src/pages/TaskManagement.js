@@ -30,6 +30,7 @@ import {
   Snackbar,
   Checkbox,
   ListItemText,
+  Autocomplete,
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
@@ -49,8 +50,8 @@ const TaskManagement = () => {
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [searchText, setSearchText] = useState('');
   const debouncedSearch = useDebounce(searchText, 500);
-  const [orderBy, setOrderBy] = useState('title');
-  const [order, setOrder] = useState('asc');
+  const [orderBy, setOrderBy] = useState('createdAt');
+  const [order, setOrder] = useState('desc');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [formData, setFormData] = useState({
@@ -510,56 +511,59 @@ const TaskManagement = () => {
             onChange={handleChange}
           />
           <FormControl fullWidth margin="normal">
-            <InputLabel>Project</InputLabel>
-            <Select
-              name="projectId"
-              value={formData.projectId}
-              onChange={handleChange}
-              label="Project"
-              required
-            >
-              {projects.map((project) => (
-                <MenuItem key={project.id} value={project.id}>
-                  {project.name}
-                </MenuItem>
-              ))}
-            </Select>
+            <Autocomplete
+              options={projects}
+              getOptionLabel={(option) => option.name}
+              value={projects.find(project => project.id === formData.projectId) || null}
+              onChange={(event, newValue) => {
+                setFormData({ ...formData, projectId: newValue ? newValue.id : '' });
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Project"
+                  placeholder="Search for project..."
+                  required
+                />
+              )}
+            />
           </FormControl>
           {(user.role === 'admin' || user.role === 'project_manager') && (
             <FormControl fullWidth margin="normal">
-              <InputLabel>Owner</InputLabel>
-              <Select
-                name="ownerId"
-                value={formData.ownerId}
-                onChange={handleChange}
-                label="Owner"
-              >
-                {users.map((u) => (
-                  <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>
-                ))}
-              </Select>
+              <Autocomplete
+                options={users}
+                getOptionLabel={(option) => option.name}
+                value={users.find(user => user.id === formData.ownerId) || null}
+                onChange={(event, newValue) => {
+                  setFormData({ ...formData, ownerId: newValue ? newValue.id : '' });
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Owner"
+                    placeholder="Search for owner..."
+                  />
+                )}
+              />
             </FormControl>
           )}
           <FormControl fullWidth margin="normal">
-            <InputLabel>Assignees</InputLabel>
-            <Select
+            <Autocomplete
               multiple
-              name="assignedTo"
-              value={formData.assignedTo}
-              onChange={handleChange}
-              label="Assignees"
-              renderValue={(selected) => {
-                const selectedUsers = users.filter(u => selected.includes(u.id));
-                return selectedUsers.map(u => u.name).join(', ');
+              options={users}
+              getOptionLabel={(option) => option.name}
+              value={users.filter(user => formData.assignedTo.includes(user.id))}
+              onChange={(event, newValue) => {
+                setFormData({ ...formData, assignedTo: newValue.map(user => user.id) });
               }}
-            >
-              {users.map((user) => (
-                <MenuItem key={user.id} value={user.id}>
-                  <Checkbox checked={formData.assignedTo.indexOf(user.id) > -1} />
-                  <ListItemText primary={user.name} />
-                </MenuItem>
-              ))}
-            </Select>
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Assignees"
+                  placeholder="Search for assignees..."
+                />
+              )}
+            />
           </FormControl>
           <FormControl fullWidth margin="normal">
             <InputLabel>Status</InputLabel>
@@ -628,7 +632,6 @@ const TaskManagement = () => {
               <MenuItem value='pages'>Pages</MenuItem>
               <MenuItem value='images'>Images</MenuItem>
               <MenuItem value='records'>Records</MenuItem>
-              <MenuItem value='charts'>Charts</MenuItem>
             </Select>
           </FormControl>
         </DialogContent>

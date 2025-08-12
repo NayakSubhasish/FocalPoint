@@ -42,8 +42,11 @@ module.exports = (sequelize, Sequelize) => {
       defaultValue: 0,
     },
     transactionType: {
-      type: DataTypes.ENUM('pages', 'images', 'records', 'charts'),
+      type: DataTypes.STRING,
       allowNull: true,
+      validate: {
+        isIn: [['pages', 'images', 'records']]
+      }
     },
     estimatedHours: {
       type: DataTypes.FLOAT,

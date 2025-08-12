@@ -86,7 +86,10 @@ BEGIN
         createdAt DATETIME2 NOT NULL DEFAULT GETDATE(),
         updatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
         CONSTRAINT FK_Tasks_Project FOREIGN KEY (projectId) REFERENCES dbo.Projects(id),
-        CONSTRAINT FK_Tasks_Assignee FOREIGN KEY (assignedTo) REFERENCES dbo.Users(id)
+        CONSTRAINT FK_Tasks_Assignee FOREIGN KEY (assignedTo) REFERENCES dbo.Users(id),
+        CONSTRAINT CK_Tasks_Status CHECK (status IN ('todo', 'in_progress', 'review', 'completed')),
+        CONSTRAINT CK_Tasks_Priority CHECK (priority IN ('low', 'medium', 'high')),
+        CONSTRAINT CK_Tasks_TransactionType CHECK (transactionType IS NULL OR transactionType IN ('pages', 'images', 'records', 'charts'))
     );
 END
 GO
@@ -105,7 +108,8 @@ BEGIN
         createdAt DATETIME2 NOT NULL DEFAULT GETDATE(),
         updatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
         CONSTRAINT FK_TimeEntry_User FOREIGN KEY (userId) REFERENCES dbo.Users(id),
-        CONSTRAINT FK_TimeEntry_Task FOREIGN KEY (taskId) REFERENCES dbo.Tasks(id)
+        CONSTRAINT FK_TimeEntry_Task FOREIGN KEY (taskId) REFERENCES dbo.Tasks(id),
+        CONSTRAINT CK_TimeEntry_TransactionType CHECK (transactionType IS NULL OR transactionType IN ('pages', 'images', 'records', 'charts'))
     );
 END
 GO

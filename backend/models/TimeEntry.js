@@ -30,8 +30,11 @@ module.exports = (sequelize, Sequelize) => {
       allowNull: true,
     },
     transactionType: {
-      type: DataTypes.ENUM('pages', 'images', 'records', 'charts'),
+      type: DataTypes.STRING,
       allowNull: true,
+      validate: {
+        isIn: [['pages', 'images', 'records']]
+      }
     },
     date: {
       type: DataTypes.DATEONLY,

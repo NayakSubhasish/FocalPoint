@@ -10,6 +10,7 @@ router.get('/', auth, authorize(['admin', 'project_manager', 'team_leader']), as
   try {
     const users = await User.findAll({
       attributes: ['id', 'name', 'email', 'role', 'isActive'],
+      order: [['createdAt', 'DESC']],
     });
     res.json(users);
   } catch (error) {
@@ -132,7 +133,8 @@ router.delete('/:id', auth, authorize(['admin']), async (req, res) => {
 router.get('/all', auth, authorize(['admin']), async (req, res) => {
   try {
     const users = await db.User.findAll({
-      attributes: { exclude: ['password'] }
+      attributes: { exclude: ['password'] },
+      order: [['createdAt', 'DESC']],
     });
     res.json(users);
   } catch (error) {

@@ -31,6 +31,7 @@ router.get('/', auth, authorize(['admin', 'project_manager', 'team_leader']), as
           attributes: ['id', 'name', 'email'],
         },
       ],
+      order: [['createdAt', 'DESC']],
     });
     res.json(tasks);
   } catch (error) {
@@ -66,6 +67,7 @@ router.get('/project/:projectId', auth, async (req, res) => {
           attributes: ['id', 'name', 'email'],
         },
       ],
+      order: [['createdAt', 'DESC']],
     });
     res.json(tasks);
   } catch (error) {
@@ -101,6 +103,7 @@ router.get('/my-tasks', auth, async (req, res) => {
           attributes: ['id', 'name', 'email'],
         },
       ],
+      order: [['createdAt', 'DESC']],
     });
 
     // Filter tasks that have the current user either as primary assignee or in assignees list
@@ -131,7 +134,7 @@ router.post('/', auth, authorize(['admin', 'project_manager', 'team_leader']), a
     const assigneeIds = Array.isArray(assignedTo) ? assignedTo : (assignedTo ? [assignedTo] : []);
     const primaryAssigneeId = assigneeIds.length ? assigneeIds[0] : null;
 
-    const task = await Task.create({
+    const taskData = {
       title,
       description,
       projectId,
@@ -140,9 +143,15 @@ router.post('/', auth, authorize(['admin', 'project_manager', 'team_leader']), a
       priority,
       estimatedHours,
       estimatedTransactions,
-      transactionType,
       deadline,
-    });
+    };
+
+    // If transactionType is provided and not empty, add it
+    if (transactionType && transactionType.trim() !== '') {
+      taskData.transactionType = transactionType;
+    }
+
+    const task = await Task.create(taskData);
 
     if (assigneeIds.length) {
       await task.setAssignees(assigneeIds);

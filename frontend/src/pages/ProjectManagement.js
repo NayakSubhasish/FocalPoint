@@ -29,6 +29,7 @@ import {
   Skeleton,
   Checkbox,
   ListItemText,
+  Autocomplete,
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
@@ -45,8 +46,8 @@ const ProjectManagement = () => {
   const [success, setSuccess] = useState('');
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [searchText, setSearchText] = useState('');
-  const [orderBy, setOrderBy] = useState('name');
-  const [order, setOrder] = useState('asc');
+  const [orderBy, setOrderBy] = useState('createdAt');
+  const [order, setOrder] = useState('desc');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [formData, setFormData] = useState({
@@ -456,69 +457,56 @@ const ProjectManagement = () => {
             onChange={handleChange}
           />
           <FormControl fullWidth margin="normal">
-            <InputLabel>Project Manager</InputLabel>
-            <Select
-              name="managerId"
-              value={formData.managerId}
-              onChange={handleChange}
-              label="Project Manager"
-            >
-              <MenuItem value="">
-                <em>No Manager Assigned</em>
-              </MenuItem>
-              {users
-                .filter(user => user.role === 'project_manager' || user.role === 'admin')
-                .map(user => (
-                  <MenuItem key={user.id} value={user.id}>
-                    {user.name}
-                  </MenuItem>
-                ))}
-            </Select>
+            <Autocomplete
+              options={users.filter(user => user.role === 'project_manager' || user.role === 'admin')}
+              getOptionLabel={(option) => option.name}
+              value={users.find(user => user.id === formData.managerId) || null}
+              onChange={(event, newValue) => {
+                setFormData({ ...formData, managerId: newValue ? newValue.id : '' });
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Project Manager"
+                  placeholder="Search for manager..."
+                />
+              )}
+            />
           </FormControl>
           <FormControl fullWidth margin="normal">
-            <InputLabel>Team Leader</InputLabel>
-            <Select
-              name="teamLeaderId"
-              value={formData.teamLeaderId}
-              onChange={handleChange}
-              label="Team Leader"
-            >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
-              {users
-                .filter(user => user.role === 'team_leader')
-                .map(user => (
-                  <MenuItem key={user.id} value={user.id}>
-                    {user.name}
-                  </MenuItem>
-                ))}
-            </Select>
+            <Autocomplete
+              options={users.filter(user => user.role === 'team_leader')}
+              getOptionLabel={(option) => option.name}
+              value={users.find(user => user.id === formData.teamLeaderId) || null}
+              onChange={(event, newValue) => {
+                setFormData({ ...formData, teamLeaderId: newValue ? newValue.id : '' });
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Team Leader"
+                  placeholder="Search for team leader..."
+                />
+              )}
+            />
           </FormControl>
           <FormControl fullWidth margin="normal">
-            <InputLabel>Team Members</InputLabel>
-            <Select
-              name="teamMemberIds"
+            <Autocomplete
               multiple
-              value={formData.teamMemberIds}
-              onChange={handleChange}
-              label="Team Members"
-              renderValue={selected =>
-                users
-                  .filter(u => selected.includes(u.id))
-                  .map(u => u.name)
-                  .join(', ')
-              }
-            >
-              {users
-                .filter(user => user.role === 'team_member')
-                .map(user => (
-                  <MenuItem key={user.id} value={user.id}>
-                    <Checkbox checked={formData.teamMemberIds.includes(user.id)} />
-                    <ListItemText primary={user.name} />
-                  </MenuItem>
-                ))}
-            </Select>
+              options={users.filter(user => user.role === 'team_member')}
+              getOptionLabel={(option) => option.name}
+              value={users.filter(user => formData.teamMemberIds.includes(user.id))}
+              onChange={(event, newValue) => {
+                setFormData({ ...formData, teamMemberIds: newValue.map(user => user.id) });
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Team Members"
+                  placeholder="Search for team members..."
+                />
+              )}
+            />
           </FormControl>
           <FormControl fullWidth margin="normal">
             <InputLabel>Status</InputLabel>

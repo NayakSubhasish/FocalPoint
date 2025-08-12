@@ -59,8 +59,8 @@ const UserManagement = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [searchText, setSearchText] = useState('');
-  const [orderBy, setOrderBy] = useState('name');
-  const [order, setOrder] = useState('asc');
+  const [orderBy, setOrderBy] = useState('createdAt');
+  const [order, setOrder] = useState('desc');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
