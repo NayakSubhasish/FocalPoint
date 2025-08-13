@@ -492,6 +492,7 @@ const TaskManagement = () => {
           {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
           
           <TextField
+            autoFocus
             margin="normal"
             name="title"
             label="Task Title"
@@ -516,7 +517,12 @@ const TaskManagement = () => {
               getOptionLabel={(option) => option.name}
               value={projects.find(project => project.id === formData.projectId) || null}
               onChange={(event, newValue) => {
-                setFormData({ ...formData, projectId: newValue ? newValue.id : '' });
+                const selectedProject = newValue;
+                setFormData({ 
+                  ...formData, 
+                  projectId: newValue ? newValue.id : '',
+                  description: selectedProject ? selectedProject.description : ''
+                });
               }}
               renderInput={(params) => (
                 <TextField
@@ -632,6 +638,7 @@ const TaskManagement = () => {
               <MenuItem value='pages'>Pages</MenuItem>
               <MenuItem value='images'>Images</MenuItem>
               <MenuItem value='records'>Records</MenuItem>
+              <MenuItem value='charts'>Charts</MenuItem>
             </Select>
           </FormControl>
         </DialogContent>

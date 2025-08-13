@@ -69,6 +69,7 @@ router.post('/', auth, async (req, res) => {
       date: date || new Date(),
       fileName,
     });
+    
     console.log('Created TimeEntry:', entry.toJSON());
     const fullEntry = await TimeEntry.findByPk(entry.id, {
       include: [

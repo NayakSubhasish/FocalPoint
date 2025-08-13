@@ -79,13 +79,21 @@ if (process.env.NODE_ENV !== 'production') {
         console.log('fileName column added successfully');
       }
 
-      // Drop existing transactionType CHECK constraints so 'charts' is accepted
-      console.log('Dropping transactionType CHECK constraints if they exist...');
-      await sequelize.query("IF EXISTS (SELECT * FROM sys.check_constraints WHERE name = 'CK_Tasks_TransactionType') ALTER TABLE dbo.Tasks DROP CONSTRAINT CK_Tasks_TransactionType;");
-      await sequelize.query("IF EXISTS (SELECT * FROM sys.check_constraints WHERE name = 'CK_TimeEntry_TransactionType') ALTER TABLE dbo.TimeEntry DROP CONSTRAINT CK_TimeEntry_TransactionType;");
+      // Drop and recreate transactionType constraints to include 'charts'
+      console.log('Updating transactionType constraints to include charts...');
+      
+      // Drop existing constraints
+      await sequelize.query("IF EXISTS (SELECT * FROM sys.check_constraints WHERE name = 'CK__Tasks__transacti__01C9240F') ALTER TABLE Tasks DROP CONSTRAINT CK__Tasks__transacti__01C9240F;");
+      await sequelize.query("IF EXISTS (SELECT * FROM sys.check_constraints WHERE name = 'CK__TimeEntri__trans__096A45D7') ALTER TABLE TimeEntries DROP CONSTRAINT CK__TimeEntri__trans__096A45D7;");
+      
       // Sync database schema (alter existing tables)
       await sequelize.sync({ alter: true });
       console.log('Database synced successfully (with schema alterations)');
+
+      // Add new constraints that include 'charts'
+      await sequelize.query("ALTER TABLE Tasks ADD CONSTRAINT CK_Tasks_TransactionType CHECK (transactionType IS NULL OR transactionType IN ('pages', 'images', 'records', 'charts'));");
+      await sequelize.query("ALTER TABLE TimeEntries ADD CONSTRAINT CK_TimeEntries_TransactionType CHECK (transactionType IS NULL OR transactionType IN ('pages', 'images', 'records', 'charts'));");
+      console.log('Transaction type constraints updated to include charts');
 
       // Seed admin user if needed
       try {

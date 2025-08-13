@@ -152,7 +152,7 @@ router.post('/', auth, authorize(['admin', 'project_manager', 'team_leader']), a
     }
 
     const task = await Task.create(taskData);
-
+    
     if (assigneeIds.length) {
       await task.setAssignees(assigneeIds);
     }
@@ -236,7 +236,7 @@ router.put('/:id', auth, authorize(['admin', 'project_manager', 'team_leader', '
     }
 
     await task.update(updates);
-
+    
     // Update many-to-many relationship
     await task.setAssignees(assigneeIds);
 
