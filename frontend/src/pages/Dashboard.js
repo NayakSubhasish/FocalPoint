@@ -249,15 +249,15 @@ const Dashboard = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
-                alignItems: 'flex-start',
+                alignItems: 'center',
               }}
             >
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="subtitle1" color="textSecondary" sx={{ fontSize: '1.1rem', fontWeight: 500, mb: 1, textAlign: 'left' }}>
+              <CardContent sx={{ p: 3, textAlign: 'center', width: '100%' }}>
+                <Typography variant="subtitle1" color="textSecondary" sx={{ fontSize: '1.1rem', fontWeight: 500, mb: 1, textAlign: 'center' }}>
                   {label}
                 </Typography>
-                <Typography variant="h5" color="primary" sx={{ fontWeight: 700, fontSize: '2rem', textAlign: 'left', lineHeight: 1.2 }}>
-                  {stats[key] ?? 0}
+                <Typography variant="h5" color="primary" sx={{ fontWeight: 700, fontSize: '2rem', textAlign: 'center', lineHeight: 1.2 }}>
+                  {(stats[key] ?? 0).toLocaleString()}
                 </Typography>
               </CardContent>
             </Card>
@@ -287,12 +287,12 @@ const Dashboard = () => {
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'center',
-                  alignItems: 'flex-start',
+                  alignItems: 'center',
                 }}
                 onClick={() => handleReportClick(key)}
               >
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="subtitle1" color="textSecondary" sx={{ fontSize: '1.1rem', fontWeight: 500, mb: 1, textAlign: 'left' }}>
+                <CardContent sx={{ p: 3, textAlign: 'center', width: '100%' }}>
+                  <Typography variant="subtitle1" color="textSecondary" sx={{ fontSize: '1.1rem', fontWeight: 500, mb: 1, textAlign: 'center' }}>
                     {label}
                   </Typography>
                 </CardContent>
