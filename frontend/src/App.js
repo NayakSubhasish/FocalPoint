@@ -11,6 +11,7 @@ import UserManagement from './pages/UserManagement';
 import ProjectManagement from './pages/ProjectManagement';
 import TaskManagement from './pages/TaskManagement';
 import TimeTransactions from './pages/TimeTransactions';
+import BreakAndLeisure from './pages/BreakAndLeisure';
 import { useMediaQuery } from '@mui/material';
 
 function App() {
@@ -81,7 +82,7 @@ function App() {
                       <Route 
                         path="/users" 
                         element={
-                          <ProtectedRoute requiredRoles={['admin']}>
+                          <ProtectedRoute requiredRoles={['admin', 'project_manager', 'team_leader']}>
                             <UserManagement />
                           </ProtectedRoute>
                         } 
@@ -107,6 +108,14 @@ function App() {
                         element={
                           <ProtectedRoute requiredRoles={['admin', 'project_manager', 'team_member', 'team_leader']}>
                             <TimeTransactions />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/break-leisure"
+                        element={
+                          <ProtectedRoute requiredRoles={['admin', 'project_manager', 'team_member', 'team_leader']}>
+                            <BreakAndLeisure />
                           </ProtectedRoute>
                         }
                       />

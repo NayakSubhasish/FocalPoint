@@ -94,6 +94,22 @@ BEGIN
 END
 GO
 
+-- Create TaskAssignee table
+IF OBJECT_ID('dbo.TaskAssignee', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.TaskAssignee (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        taskId INT NOT NULL,
+        userId INT NOT NULL,
+        createdAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+        updatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_TaskAssignee_Task FOREIGN KEY (taskId) REFERENCES dbo.Tasks(id),
+        CONSTRAINT FK_TaskAssignee_User FOREIGN KEY (userId) REFERENCES dbo.Users(id),
+        CONSTRAINT UQ_TaskAssignee_TaskUser UNIQUE (taskId, userId)
+    );
+END
+GO
+
 -- Create TimeEntry table
 IF OBJECT_ID('dbo.TimeEntry', 'U') IS NULL
 BEGIN
@@ -110,6 +126,26 @@ BEGIN
         CONSTRAINT FK_TimeEntry_User FOREIGN KEY (userId) REFERENCES dbo.Users(id),
         CONSTRAINT FK_TimeEntry_Task FOREIGN KEY (taskId) REFERENCES dbo.Tasks(id),
         CONSTRAINT CK_TimeEntry_TransactionType CHECK (transactionType IS NULL OR transactionType IN ('pages', 'images', 'records', 'charts'))
+    );
+END
+GO
+
+-- Create Breaks table
+IF OBJECT_ID('dbo.breaks', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.breaks (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        userId INT NOT NULL,
+        type NVARCHAR(20) NOT NULL DEFAULT 'other',
+        description NTEXT NULL,
+        startTime DATETIME2 NOT NULL DEFAULT GETDATE(),
+        endTime DATETIME2 NULL,
+        duration INT NULL,
+        isActive BIT NOT NULL DEFAULT 1,
+        createdAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+        updatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_Breaks_User FOREIGN KEY (userId) REFERENCES dbo.Users(id),
+        CONSTRAINT CK_Breaks_Type CHECK (type IN ('coffee', 'lunch', 'meeting', 'other'))
     );
 END
 GO

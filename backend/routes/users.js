@@ -19,13 +19,18 @@ router.get('/', auth, authorize(['admin', 'project_manager', 'team_leader']), as
   }
 });
 
-// Create new user (admin only)
-router.post('/', auth, authorize(['admin']), async (req, res) => {
+// Create new user (admin, project managers, and team leaders)
+router.post('/', auth, authorize(['admin', 'project_manager', 'team_leader']), async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
     
     if (!name || !email || !password || !role) {
       return res.status(400).json({ message: 'All fields are required.' });
+    }
+    
+    // Project managers and team leaders cannot create admin users
+    if ((req.user.role === 'project_manager' || req.user.role === 'team_leader') && role === 'admin') {
+      return res.status(403).json({ message: 'Project managers and team leaders cannot create admin users.' });
     }
     
     const user = await User.create({
@@ -49,8 +54,8 @@ router.post('/', auth, authorize(['admin']), async (req, res) => {
   }
 });
 
-// Update user (admin only)
-router.put('/:id', auth, authorize(['admin']), async (req, res) => {
+// Update user (admin, project managers, and team leaders)
+router.put('/:id', auth, authorize(['admin', 'project_manager', 'team_leader']), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email, password, role, isActive } = req.body;
@@ -62,6 +67,16 @@ router.put('/:id', auth, authorize(['admin']), async (req, res) => {
     const user = await User.findByPk(id);
     if (!user) {
       return res.status(404).json({ message: 'User not found.' });
+    }
+
+    // Project managers and team leaders cannot update admin users or change users to admin role
+    if (req.user.role === 'project_manager' || req.user.role === 'team_leader') {
+      if (user.role === 'admin') {
+        return res.status(403).json({ message: 'Project managers and team leaders cannot modify admin users.' });
+      }
+      if (role === 'admin') {
+        return res.status(403).json({ message: 'Project managers and team leaders cannot assign admin role.' });
+      }
     }
 
     // Prepare update data
@@ -99,12 +114,12 @@ router.put('/:id', auth, authorize(['admin']), async (req, res) => {
   }
 });
 
-// Delete user (admin only)
-router.delete('/:id', auth, authorize(['admin']), async (req, res) => {
+// Delete user (admin, project managers, and team leaders)
+router.delete('/:id', auth, authorize(['admin', 'project_manager', 'team_leader']), async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Prevent admin from deleting themselves
+    // Prevent users from deleting themselves
     if (parseInt(id) === req.user.id) {
       return res.status(400).json({ message: 'Cannot delete your own account.' });
     }
@@ -115,8 +130,13 @@ router.delete('/:id', auth, authorize(['admin']), async (req, res) => {
       return res.status(404).json({ message: 'User not found.' });
     }
 
-    // Check if user is admin - prevent deleting other admins
-    if (user.role === 'admin') {
+    // Project managers and team leaders cannot delete admin users
+    if ((req.user.role === 'project_manager' || req.user.role === 'team_leader') && user.role === 'admin') {
+      return res.status(403).json({ message: 'Project managers and team leaders cannot delete admin users.' });
+    }
+
+    // Check if user is admin - prevent deleting other admins (for admin users)
+    if (req.user.role === 'admin' && user.role === 'admin') {
       return res.status(400).json({ message: 'Cannot delete admin users.' });
     }
 

@@ -12,6 +12,8 @@ const TimeTransactions = () => {
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState({ taskId: '', date: '', hours: '', transactions: '', transactionType: '', fileName: '', userId: '' });
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
+  const [dateFilters, setDateFilters] = useState({ startDate: '', endDate: '' });
+  const [loading, setLoading] = useState(false);
   // Export current entries to CSV
   const handleExportCsv = () => {
     if (!entries.length) {
@@ -19,28 +21,54 @@ const TimeTransactions = () => {
       return;
     }
 
+    // Helper function to escape CSV values and handle special characters
+    const escapeCsvValue = (value) => {
+      if (value === null || value === undefined) return '';
+      const stringValue = String(value);
+      // If the value contains comma, quote, or newline, wrap it in quotes and escape internal quotes
+      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n') || stringValue.includes('\r')) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+      return stringValue;
+    };
+
     const headers = ['Employee','Project','Task','File Name','Date','Hours','Transactions','Type'];
     const csvRows = [headers.join(',')];
 
     entries.forEach((e) => {
-      csvRows.push([
-        e.user?.name || '',
-        e.task?.Project?.name || '',
-        e.task?.title || '',
-        e.fileName || '',
-        e.date,
-        e.hours,
-        e.transactions,
-        e.transactionType || ''
-      ].join(','));
+      const row = [
+        escapeCsvValue(e.user?.name || ''),
+        escapeCsvValue(e.task?.Project?.name || ''),
+        escapeCsvValue(e.task?.title || ''),
+        escapeCsvValue(e.fileName || ''),
+        escapeCsvValue(e.date),
+        escapeCsvValue(e.hours),
+        escapeCsvValue(e.transactions),
+        escapeCsvValue(e.transactionType || '')
+      ];
+      csvRows.push(row.join(','));
     });
 
     const csvString = csvRows.join('\n');
-    const blob = new Blob([csvString], { type: 'text/csv' });
+    // Add BOM for proper UTF-8 encoding
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvString], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `time_entries_${new Date().toISOString().split('T')[0]}.csv`;
+    
+    // Generate filename with date range if filters are applied
+    let filename = `time_entries_${new Date().toISOString().split('T')[0]}`;
+    if (dateFilters.startDate && dateFilters.endDate) {
+      filename += `_${dateFilters.startDate}_to_${dateFilters.endDate}`;
+    } else if (dateFilters.startDate) {
+      filename += `_from_${dateFilters.startDate}`;
+    } else if (dateFilters.endDate) {
+      filename += `_to_${dateFilters.endDate}`;
+    }
+    filename += '.csv';
+    
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -65,12 +93,30 @@ const TimeTransactions = () => {
     // fetch entries
     const fetchEntries = async () => {
       try {
-        const res = await fetch(`${process.env.REACT_APP_API_URL}/time-transactions`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+        setLoading(true);
+        let url = `${process.env.REACT_APP_API_URL}/time-transactions`;
+        const params = new URLSearchParams();
+        
+        if (dateFilters.startDate) {
+          params.append('startDate', dateFilters.startDate);
+        }
+        if (dateFilters.endDate) {
+          params.append('endDate', dateFilters.endDate);
+        }
+        
+        if (params.toString()) {
+          url += `?${params.toString()}`;
+        }
+        
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
         if (!res.ok) throw new Error('Failed to fetch entries');
         const data = await res.json();
         setEntries(data);
       } catch (err) {
         console.error(err);
+        setSnackbar({ open: true, message: 'Failed to fetch entries' });
+      } finally {
+        setLoading(false);
       }
     };
     // fetch users for admin/pm
@@ -87,7 +133,7 @@ const TimeTransactions = () => {
     fetchTasks();
     fetchEntries();
     fetchUsers();
-  }, [user]);
+  }, [user, dateFilters]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -192,6 +238,103 @@ const TimeTransactions = () => {
   return (
     <Box p={3}>
       <Typography variant="h5" mb={2}>Time & Transactions</Typography>
+      
+      {/* Date Range Filters */}
+      <Box display="flex" gap={2} flexWrap="wrap" mb={3} alignItems="center">
+        <Typography variant="subtitle1" sx={{ fontWeight: 600, mr: 1 }}>
+          Date Range Filter:
+        </Typography>
+        <TextField
+          label="Start Date"
+          type="date"
+          size="small"
+          value={dateFilters.startDate}
+          onChange={(e) => setDateFilters({ ...dateFilters, startDate: e.target.value })}
+          InputLabelProps={{ shrink: true }}
+          sx={{ minWidth: 150 }}
+        />
+        <TextField
+          label="End Date"
+          type="date"
+          size="small"
+          value={dateFilters.endDate}
+          onChange={(e) => setDateFilters({ ...dateFilters, endDate: e.target.value })}
+          InputLabelProps={{ shrink: true }}
+          sx={{ minWidth: 150 }}
+        />
+        <Button 
+          variant="outlined" 
+          size="small"
+          onClick={() => setDateFilters({ startDate: '', endDate: '' })}
+        >
+          Clear Filters
+        </Button>
+        <Button 
+          variant="outlined" 
+          size="small"
+          onClick={() => {
+            const today = new Date();
+            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+            setDateFilters({ 
+              startDate: firstDay.toISOString().split('T')[0], 
+              endDate: today.toISOString().split('T')[0] 
+            });
+          }}
+        >
+          This Month
+        </Button>
+        <Button 
+          variant="outlined" 
+          size="small"
+          onClick={() => {
+            const today = new Date();
+            const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+            setDateFilters({ 
+              startDate: lastMonth.toISOString().split('T')[0], 
+              endDate: lastMonthEnd.toISOString().split('T')[0] 
+            });
+          }}
+        >
+          Last Month
+        </Button>
+        {loading && <Typography variant="body2" color="textSecondary">Loading...</Typography>}
+      </Box>
+      
+      {/* Summary Statistics */}
+      {entries.length > 0 && (
+        <Box display="flex" gap={3} mb={3} flexWrap="wrap">
+          <Box sx={{ p: 2, bgcolor: 'primary.light', color: 'white', borderRadius: 1, minWidth: 120, textAlign: 'center' }}>
+            <Typography variant="h6">{entries.length.toLocaleString()}</Typography>
+            <Typography variant="body2">Total Entries</Typography>
+          </Box>
+          <Box sx={{ p: 2, bgcolor: 'success.light', color: 'white', borderRadius: 1, minWidth: 120, textAlign: 'center' }}>
+            <Typography variant="h6">
+              {entries.reduce((sum, entry) => sum + (parseFloat(entry.hours) || 0), 0).toFixed(2)}
+            </Typography>
+            <Typography variant="body2">Total Hours</Typography>
+          </Box>
+          <Box sx={{ p: 2, bgcolor: 'info.light', color: 'white', borderRadius: 1, minWidth: 120, textAlign: 'center' }}>
+            <Typography variant="h6">
+              {entries.reduce((sum, entry) => sum + (parseInt(entry.transactions) || 0), 0).toLocaleString()}
+            </Typography>
+            <Typography variant="body2">Total Transactions</Typography>
+          </Box>
+          {(dateFilters.startDate || dateFilters.endDate) && (
+            <Box sx={{ p: 2, bgcolor: 'warning.light', color: 'white', borderRadius: 1, minWidth: 200 }}>
+              <Typography variant="body2">
+                {dateFilters.startDate && dateFilters.endDate 
+                  ? `Filtered: ${dateFilters.startDate} to ${dateFilters.endDate}`
+                  : dateFilters.startDate 
+                    ? `From: ${dateFilters.startDate}`
+                    : `To: ${dateFilters.endDate}`
+                }
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      )}
+      
       <Box display="flex" gap={2} flexWrap="wrap" mb={3}>
         {(user.role === 'admin' || user.role === 'project_manager') && (
           <Autocomplete

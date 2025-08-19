@@ -9,10 +9,28 @@ router.get('/', auth, async (req, res) => {
   try {
     const role = req.user.role;
     const userId = req.user.id;
+    const { startDate, endDate } = req.query;
+    
     let where = {};
+    
+    // Add date range filter if provided
+    if (startDate && endDate) {
+      where.date = {
+        [require('sequelize').Op.between]: [startDate, endDate]
+      };
+    } else if (startDate) {
+      where.date = {
+        [require('sequelize').Op.gte]: startDate
+      };
+    } else if (endDate) {
+      where.date = {
+        [require('sequelize').Op.lte]: endDate
+      };
+    }
+    
     // Admins and project managers see all entries
     if (role === 'admin' || role === 'project_manager') {
-      // no filter
+      // no additional user filter
     } else if (role === 'team_leader') {
       // find projects where user is lead
       const leadProjects = await ProjectTeam.findAll({ where: { userId, role: 'lead' } });

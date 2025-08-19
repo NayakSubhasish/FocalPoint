@@ -24,6 +24,7 @@ import {
   AccessTime,
   CheckBox,
   CheckBoxOutlined,
+  Coffee,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import logo from '../logo.png';
@@ -44,10 +45,11 @@ const Layout = ({ children, mode, toggleMode }) => {
 
   const navItems = [
     { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
-    ...(user && user.role === 'admin' ? [{ text: 'Users', icon: <People />, path: '/users' }] : []),
+    ...(user && (user.role === 'admin' || user.role === 'project_manager' || user.role === 'team_leader') ? [{ text: 'Users', icon: <People />, path: '/users' }] : []),
     { text: 'Projects', icon: <Assignment />, path: '/projects' },
     { text: 'Tasks', icon: <CheckBoxOutlined />, path: '/tasks' },
     { text: 'Time & Transactions', icon: <AccessTime />, path: '/time-transactions' },
+    { text: 'Break & Leisure', icon: <Coffee />, path: '/break-leisure' },
   ];
 
   const [anchorEl, setAnchorEl] = useState(null);

@@ -31,6 +31,7 @@ db.ProjectTeam = require('./ProjectTeam')(sequelize, Sequelize);
 db.Task = require('./Task')(sequelize, Sequelize);
 db.TimeEntry = require('./TimeEntry')(sequelize, Sequelize);
 db.TaskAssignee = require('./TaskAssignee')(sequelize, Sequelize);
+db.Break = require('./Break')(sequelize, Sequelize);
 
 // Set up associations
 Object.keys(db).forEach((modelName) => {
@@ -86,14 +87,57 @@ if (process.env.NODE_ENV !== 'production') {
       await sequelize.query("IF EXISTS (SELECT * FROM sys.check_constraints WHERE name = 'CK__Tasks__transacti__01C9240F') ALTER TABLE Tasks DROP CONSTRAINT CK__Tasks__transacti__01C9240F;");
       await sequelize.query("IF EXISTS (SELECT * FROM sys.check_constraints WHERE name = 'CK__TimeEntri__trans__096A45D7') ALTER TABLE TimeEntries DROP CONSTRAINT CK__TimeEntri__trans__096A45D7;");
       
-      // Sync database schema (alter existing tables)
-      await sequelize.sync({ alter: true });
-      console.log('Database synced successfully (with schema alterations)');
+      // Sync database schema (alter existing tables) - skip if there are constraint issues
+      try {
+        await sequelize.sync({ alter: true });
+        console.log('Database synced successfully (with schema alterations)');
+      } catch (syncError) {
+        console.log('Database sync with alterations failed, trying force sync for new tables only...');
+        // Only sync new tables that don't exist
+        await sequelize.sync({ force: false });
+        console.log('Database synced successfully (new tables only)');
+      }
 
-      // Add new constraints that include 'charts'
-      await sequelize.query("ALTER TABLE Tasks ADD CONSTRAINT CK_Tasks_TransactionType CHECK (transactionType IS NULL OR transactionType IN ('pages', 'images', 'records', 'charts'));");
-      await sequelize.query("ALTER TABLE TimeEntries ADD CONSTRAINT CK_TimeEntries_TransactionType CHECK (transactionType IS NULL OR transactionType IN ('pages', 'images', 'records', 'charts'));");
-      console.log('Transaction type constraints updated to include charts');
+      // Add new constraints that include 'charts' - only if they don't exist
+      try {
+        await sequelize.query("ALTER TABLE Tasks ADD CONSTRAINT CK_Tasks_TransactionType CHECK (transactionType IS NULL OR transactionType IN ('pages', 'images', 'records', 'charts'));");
+        console.log('Tasks transaction type constraint added');
+      } catch (constraintError) {
+        console.log('Tasks constraint already exists or failed:', constraintError.message);
+      }
+      
+      try {
+        await sequelize.query("ALTER TABLE TimeEntries ADD CONSTRAINT CK_TimeEntries_TransactionType CHECK (transactionType IS NULL OR transactionType IN ('pages', 'images', 'records', 'charts'));");
+        console.log('TimeEntries transaction type constraint added');
+      } catch (constraintError) {
+        console.log('TimeEntries constraint already exists or failed:', constraintError.message);
+      }
+
+      // Create breaks table if it doesn't exist
+      try {
+        await sequelize.query(`
+          IF OBJECT_ID('dbo.breaks', 'U') IS NULL
+          BEGIN
+              CREATE TABLE dbo.breaks (
+                  id INT IDENTITY(1,1) PRIMARY KEY,
+                  userId INT NOT NULL,
+                  type NVARCHAR(20) NOT NULL DEFAULT 'other',
+                  description NTEXT NULL,
+                  startTime DATETIME2 NOT NULL DEFAULT GETDATE(),
+                  endTime DATETIME2 NULL,
+                  duration INT NULL,
+                  isActive BIT NOT NULL DEFAULT 1,
+                  createdAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+                  updatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+                  CONSTRAINT FK_Breaks_User FOREIGN KEY (userId) REFERENCES dbo.Users(id),
+                  CONSTRAINT CK_Breaks_Type CHECK (type IN ('coffee', 'lunch', 'meeting', 'other'))
+              );
+          END
+        `);
+        console.log('Breaks table created successfully');
+      } catch (tableError) {
+        console.log('Breaks table creation error (might already exist):', tableError.message);
+      }
 
       // Seed admin user if needed
       try {

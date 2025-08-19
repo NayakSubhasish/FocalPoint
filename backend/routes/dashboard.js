@@ -1,5 +1,5 @@
 const express = require('express');
-const { User, Project, Task, TimeEntry, sequelize } = require('../models');
+const { User, Project, Task, TimeEntry, Break, sequelize } = require('../models');
 const { auth } = require('../middleware/auth');
 const { Op } = require('sequelize');
 
@@ -66,6 +66,12 @@ router.get('/stats', auth, async (req, res) => {
     const hoursSum = await TimeEntry.sum('hours', { where: dateFilter });
     stats.totalHours = hoursSum ? parseFloat(hoursSum.toFixed(2)) : 0;
     stats.totalTransactions = (await TimeEntry.sum('transactions', { where: dateFilter })) || 0;
+
+    // Breaks & Leisure
+    const totalBreaks = await Break.count({ where: dateFilter });
+    const totalBreakHours = await Break.sum('duration', { where: dateFilter });
+    stats.totalBreaks = totalBreaks || 0;
+    stats.totalBreakHours = totalBreakHours ? parseFloat((totalBreakHours / 60).toFixed(2)) : 0; // Convert minutes to hours
 
     // Direct counts
     stats.activeProjects = await Project.count({ where: { ...dateFilter, status: 'active' } });
@@ -448,6 +454,128 @@ router.get('/reports/user-monthly-logs', auth, async (req, res) => {
   } catch (error) {
     console.error('User monthly logs report error:', error);
     res.status(500).json({ message: 'Error fetching monthly user logs' });
+  }
+});
+
+// ✅ Breaks & Leisure Report - comprehensive break analysis
+router.get('/reports/breaks-leisure', auth, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    let whereClause = {};
+    
+    // Add date range filter if provided
+    if (startDate && endDate) {
+      whereClause.startTime = {
+        [Op.between]: [new Date(startDate), new Date(endDate)]
+      };
+    } else if (startDate) {
+      whereClause.startTime = {
+        [Op.gte]: new Date(startDate)
+      };
+    } else if (endDate) {
+      whereClause.startTime = {
+        [Op.lte]: new Date(endDate)
+      };
+    }
+
+    // Role-based access control
+    const role = req.user.role;
+    const userId = req.user.id;
+    
+    if (role === 'team_member') {
+      whereClause.userId = userId;
+    } else if (role === 'team_leader') {
+      // Team leaders can see breaks for their team members
+      const leadProjects = await sequelize.models.ProjectTeam.findAll({ 
+        where: { userId, role: 'lead' } 
+      });
+      const projectIds = leadProjects.map(pt => pt.projectId);
+      const members = await sequelize.models.ProjectTeam.findAll({ 
+        where: { projectId: projectIds, role: 'member' } 
+      });
+      const memberIds = [...new Set(members.map(pt => pt.userId))];
+      whereClause.userId = [userId, ...memberIds];
+    }
+    // Admins and project managers can see all breaks (no additional filter)
+
+    const breaks = await Break.findAll({
+      where: whereClause,
+      include: [
+        { model: User, as: 'user', attributes: ['id', 'name', 'email'] }
+      ],
+      order: [['startTime', 'DESC']],
+      raw: true,
+      nest: true
+    });
+
+    // Calculate statistics
+    const totalBreaks = breaks.length;
+    const totalDuration = breaks.reduce((sum, b) => sum + (b.duration || 0), 0);
+    const averageDuration = totalBreaks > 0 ? Math.round(totalDuration / totalBreaks) : 0;
+    
+    // Group by type
+    const breaksByType = breaks.reduce((acc, b) => {
+      const type = b.type;
+      if (!acc[type]) {
+        acc[type] = { count: 0, duration: 0, breaks: [] };
+      }
+      acc[type].count++;
+      acc[type].duration += b.duration || 0;
+      acc[type].breaks.push(b);
+      return acc;
+    }, {});
+
+    // Group by user
+    const breaksByUser = breaks.reduce((acc, b) => {
+      const userName = b.user?.name || 'Unknown';
+      if (!acc[userName]) {
+        acc[userName] = { count: 0, duration: 0, breaks: [] };
+      }
+      acc[userName].count++;
+      acc[userName].duration += b.duration || 0;
+      acc[userName].breaks.push(b);
+      return acc;
+    }, {});
+
+    // Daily breakdown
+    const breaksByDay = breaks.reduce((acc, b) => {
+      const date = new Date(b.startTime).toISOString().split('T')[0];
+      if (!acc[date]) {
+        acc[date] = { count: 0, duration: 0, breaks: [] };
+      }
+      acc[date].count++;
+      acc[date].duration += b.duration || 0;
+      acc[date].breaks.push(b);
+      return acc;
+    }, {});
+
+    res.json({
+      summary: {
+        totalBreaks,
+        totalDuration: Math.round(totalDuration),
+        totalHours: parseFloat((totalDuration / 60).toFixed(2)),
+        averageDuration,
+        averageHours: parseFloat((averageDuration / 60).toFixed(2))
+      },
+      breaksByType,
+      breaksByUser,
+      breaksByDay,
+      detailedBreaks: breaks.map(b => ({
+        id: b.id,
+        employee: b.user?.name || 'Unknown',
+        type: b.type,
+        description: b.description,
+        startTime: b.startTime,
+        endTime: b.endTime,
+        duration: b.duration,
+        durationHours: b.duration ? parseFloat((b.duration / 60).toFixed(2)) : 0,
+        isActive: b.isActive,
+        date: new Date(b.startTime).toISOString().split('T')[0]
+      }))
+    });
+  } catch (error) {
+    console.error('Breaks & Leisure report error:', error);
+    res.status(500).json({ message: 'Error fetching breaks & leisure report' });
   }
 });
 

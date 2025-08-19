@@ -39,6 +39,17 @@ const roles = [
   { value: 'team_leader', label: 'Team Leader' },
 ];
 
+// Admin can assign all roles, project managers and team leaders cannot assign admin role
+const getAvailableRoles = (userRole) => {
+  if (userRole === 'admin') {
+    return [
+      { value: 'admin', label: 'Admin' },
+      ...roles
+    ];
+  }
+  return roles;
+};
+
 const UserManagement = () => {
   const { user } = useAuth();
   
@@ -252,7 +263,31 @@ const UserManagement = () => {
   };
 
   const canDeleteUser = (userToCheck) => {
-    return userToCheck.role !== 'admin' && userToCheck.id !== user.id;
+    // Users cannot delete themselves
+    if (userToCheck.id === user.id) {
+      return false;
+    }
+    
+    // Project managers and team leaders cannot delete admin users
+    if ((user.role === 'project_manager' || user.role === 'team_leader') && userToCheck.role === 'admin') {
+      return false;
+    }
+    
+    // Admins cannot delete other admins
+    if (user.role === 'admin' && userToCheck.role === 'admin') {
+      return false;
+    }
+    
+    return true;
+  };
+
+  const canEditUser = (userToCheck) => {
+    // Project managers and team leaders cannot edit admin users
+    if ((user.role === 'project_manager' || user.role === 'team_leader') && userToCheck.role === 'admin') {
+      return false;
+    }
+    
+    return true;
   };
 
   const handleSearchChange = (e) => {
@@ -359,11 +394,13 @@ const UserManagement = () => {
                   />
                 </TableCell>
                 <TableCell>
-                  <Tooltip title="Edit">
-                    <IconButton onClick={() => handleOpen(u)} size="small">
-                      <Edit />
-                    </IconButton>
-                  </Tooltip>
+                  {canEditUser(u) && (
+                    <Tooltip title="Edit">
+                      <IconButton onClick={() => handleOpen(u)} size="small">
+                        <Edit />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                   {canDeleteUser(u) && (
                     <Tooltip title="Delete">
                       <IconButton 
@@ -466,7 +503,7 @@ const UserManagement = () => {
               label="Role"
               onChange={handleChange}
             >
-              {roles.map((r) => (
+              {getAvailableRoles(user.role).map((r) => (
                 <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>
               ))}
             </Select>
