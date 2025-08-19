@@ -3,6 +3,15 @@ const router = express.Router();
 const { auth } = require('../middleware/auth');
 const db = require('../models');
 
+// Debug route to check if breaks router is loaded
+router.get('/debug', (req, res) => {
+  res.json({ 
+    message: 'Breaks router is working', 
+    timestamp: new Date().toISOString(),
+    availableRoutes: ['/', '/all', '/:id', '/start', '/end', '/debug']
+  });
+});
+
 // Get all breaks for the authenticated user
 router.get('/', auth, async (req, res) => {
   try {
