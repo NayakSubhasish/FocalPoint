@@ -1,27 +1,19 @@
 {
   "version": 2,
   "builds": [
-    { 
-      "src": "backend/server.js", 
-      "use": "@vercel/node",
-      "config": {
-        "maxLambdaSize": "50mb"
-      }
+    {
+      "src": "backend/server.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
-    { 
-      "src": "/api/(.*)", 
-      "dest": "backend/server.js" 
+    {
+      "src": "/api/(.*)",
+      "dest": "/backend/server.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/backend/server.js"
     }
-  ],
-  "functions": {
-    "backend/server.js": {
-      "maxDuration": 30,
-      "memory": 1024
-    }
-  },
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }

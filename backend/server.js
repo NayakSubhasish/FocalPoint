@@ -5,6 +5,23 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 
+// IMMEDIATE TEST ROUTE - NO DEPENDENCIES
+app.get('/api/simple-test', (req, res) => {
+  res.json({ 
+    message: 'SIMPLE TEST WORKING', 
+    timestamp: new Date().toISOString(),
+    url: req.url,
+    method: req.method
+  });
+});
+
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Backend server root', 
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Middleware
 app.use(cors({
   origin: '*',
