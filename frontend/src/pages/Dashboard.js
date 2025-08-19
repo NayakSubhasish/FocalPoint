@@ -768,7 +768,7 @@ const Dashboard = () => {
                       }}
                     >
                       {label}
-                    </Typography>
+                </Typography>
               </CardContent>
             </Card>
               </Grow>
