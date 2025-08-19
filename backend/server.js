@@ -384,6 +384,9 @@ if (process.env.NODE_ENV !== 'production') {
     console.log(`Server is running on port ${PORT}`);
     console.log('Environment:', process.env.NODE_ENV);
   });
+} else {
+  console.log('Running in production mode on Vercel');
+  console.log('Environment:', process.env.NODE_ENV);
 }
 
 // Export for Vercel
