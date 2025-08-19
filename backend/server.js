@@ -115,6 +115,197 @@ app.post('/api/test-breaks-post', (req, res) => {
   });
 });
 
+// TEMPORARY WORKAROUND: Direct breaks routes implementation
+const { auth } = require('./middleware/auth');
+
+// Get all breaks for admins, project managers, and team leaders
+app.get('/api/breaks/all', auth, async (req, res) => {
+  try {
+    console.log('=== DIRECT BREAKS /ALL ENDPOINT CALLED ===');
+    console.log('User role:', req.user.role);
+    console.log('User ID:', req.user.id);
+    
+    // Check if user has appropriate role
+    if (!['admin', 'project_manager', 'team_leader'].includes(req.user.role)) {
+      console.log('Access denied for role:', req.user.role);
+      return res.status(403).json({ message: 'Access denied. Admin, Project Manager, or Team Leader only.' });
+    }
+    
+    console.log('Fetching all breaks using direct implementation...');
+    const breaks = await db.Break.findAll({
+      include: [
+        {
+          model: db.User,
+          as: 'user',
+          attributes: ['id', 'name', 'email'],
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+    
+    console.log('Found breaks (direct):', breaks.length);
+    console.log('=== DIRECT BREAKS /ALL ENDPOINT SUCCESS ===');
+    res.json(breaks);
+  } catch (error) {
+    console.error('=== DIRECT BREAKS /ALL ENDPOINT ERROR ===');
+    console.error('Error fetching all breaks (direct):', error);
+    console.error('Error stack (direct):', error.stack);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+});
+
+// Get breaks for the authenticated user
+app.get('/api/breaks', auth, async (req, res) => {
+  try {
+    console.log('=== DIRECT BREAKS GET ENDPOINT CALLED ===');
+    const breaks = await db.Break.findAll({
+      where: { userId: req.user.id },
+      include: [
+        {
+          model: db.User,
+          as: 'user',
+          attributes: ['id', 'name', 'email'],
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+    console.log('Found user breaks:', breaks.length);
+    res.json(breaks);
+  } catch (error) {
+    console.error('Error fetching user breaks (direct):', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Create a new break
+app.post('/api/breaks', auth, async (req, res) => {
+  try {
+    console.log('=== DIRECT BREAKS POST ENDPOINT CALLED ===');
+    console.log('User role:', req.user.role);
+    console.log('User ID:', req.user.id);
+    console.log('Request body:', req.body);
+    
+    const { userId, type, description, startTime, endTime, durationHours } = req.body;
+    
+    // Determine target user ID based on role
+    let targetUserId;
+    if (['admin', 'project_manager', 'team_leader'].includes(req.user.role)) {
+      targetUserId = userId || req.user.id;
+    } else {
+      targetUserId = req.user.id; // Team members can only create breaks for themselves
+    }
+    
+    console.log('Target user ID:', targetUserId);
+    
+    const breakData = {
+      userId: targetUserId,
+      type: type || 'break',
+      description: description || '',
+      startTime: startTime || new Date(),
+      endTime: endTime || null,
+      durationHours: durationHours || null,
+      isActive: !endTime
+    };
+    
+    console.log('Creating break with data:', breakData);
+    const newBreak = await db.Break.create(breakData);
+    
+    const breakWithUser = await db.Break.findOne({
+      where: { id: newBreak.id },
+      include: [
+        {
+          model: db.User,
+          as: 'user',
+          attributes: ['id', 'name', 'email'],
+        },
+      ],
+    });
+    
+    console.log('=== DIRECT BREAKS POST ENDPOINT SUCCESS ===');
+    res.status(201).json(breakWithUser);
+  } catch (error) {
+    console.error('=== DIRECT BREAKS POST ENDPOINT ERROR ===');
+    console.error('Error creating break (direct):', error);
+    console.error('Error stack (direct):', error.stack);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+});
+
+// Update a break
+app.put('/api/breaks/:id', auth, async (req, res) => {
+  try {
+    console.log('=== DIRECT BREAKS PUT ENDPOINT CALLED ===');
+    const breakId = req.params.id;
+    const { type, description, startTime, endTime, durationHours } = req.body;
+    
+    // Check permissions
+    if (!['admin', 'project_manager', 'team_leader'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Access denied. Cannot edit breaks.' });
+    }
+    
+    const breakItem = await db.Break.findByPk(breakId);
+    if (!breakItem) {
+      return res.status(404).json({ message: 'Break not found' });
+    }
+    
+    const updateData = {
+      type: type || breakItem.type,
+      description: description !== undefined ? description : breakItem.description,
+      startTime: startTime || breakItem.startTime,
+      endTime: endTime !== undefined ? endTime : breakItem.endTime,
+      durationHours: durationHours !== undefined ? durationHours : breakItem.durationHours,
+      isActive: endTime ? false : breakItem.isActive
+    };
+    
+    await breakItem.update(updateData);
+    
+    const updatedBreak = await db.Break.findOne({
+      where: { id: breakId },
+      include: [
+        {
+          model: db.User,
+          as: 'user',
+          attributes: ['id', 'name', 'email'],
+        },
+      ],
+    });
+    
+    console.log('=== DIRECT BREAKS PUT ENDPOINT SUCCESS ===');
+    res.json(updatedBreak);
+  } catch (error) {
+    console.error('=== DIRECT BREAKS PUT ENDPOINT ERROR ===');
+    console.error('Error updating break (direct):', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+});
+
+// Delete a break
+app.delete('/api/breaks/:id', auth, async (req, res) => {
+  try {
+    console.log('=== DIRECT BREAKS DELETE ENDPOINT CALLED ===');
+    const breakId = req.params.id;
+    
+    // Check permissions
+    if (!['admin', 'project_manager', 'team_leader'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Access denied. Cannot delete breaks.' });
+    }
+    
+    const breakItem = await db.Break.findByPk(breakId);
+    if (!breakItem) {
+      return res.status(404).json({ message: 'Break not found' });
+    }
+    
+    await breakItem.destroy();
+    
+    console.log('=== DIRECT BREAKS DELETE ENDPOINT SUCCESS ===');
+    res.json({ message: 'Break deleted successfully' });
+  } catch (error) {
+    console.error('=== DIRECT BREAKS DELETE ENDPOINT ERROR ===');
+    console.error('Error deleting break (direct):', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+});
+
 // Debug route to list all available routes
 app.get('/api/routes', (req, res) => {
   const routes = [];
