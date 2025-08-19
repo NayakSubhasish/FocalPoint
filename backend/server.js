@@ -13,7 +13,10 @@ app.use(cors({
 app.use(express.json());
 
 // Initialize database connection
+console.log('Initializing database connection...');
 const db = require('./models');
+console.log('Database models loaded:', Object.keys(db));
+console.log('Break model available:', !!db.Break);
 
 // Debug route to check if server is working
 app.get('/api/health', (req, res) => {
@@ -70,10 +73,14 @@ try {
 }
 
 try {
-  app.use('/api/breaks', require('./routes/breaks'));
-  console.log('✓ Breaks routes loaded');
+  const breaksRouter = require('./routes/breaks');
+  console.log('Breaks router type:', typeof breaksRouter);
+  console.log('Breaks router stack length:', breaksRouter.stack ? breaksRouter.stack.length : 'no stack');
+  app.use('/api/breaks', breaksRouter);
+  console.log('✓ Breaks routes loaded successfully');
 } catch (error) {
   console.error('✗ Error loading breaks routes:', error.message);
+  console.error('✗ Error stack:', error.stack);
 }
 
 console.log('All routes loading complete.');
@@ -86,6 +93,25 @@ app.get('/api/test-server', (req, res) => {
     method: req.method,
     path: req.path,
     originalUrl: req.originalUrl
+  });
+});
+
+// Direct test route to mimic breaks functionality
+app.get('/api/test-breaks-direct', (req, res) => {
+  res.json({
+    message: 'Direct breaks test route working',
+    timestamp: new Date().toISOString(),
+    note: 'This bypasses the breaks router to test server functionality'
+  });
+});
+
+// Test POST route to mimic breaks POST
+app.post('/api/test-breaks-post', (req, res) => {
+  res.json({
+    message: 'Direct breaks POST test working',
+    timestamp: new Date().toISOString(),
+    body: req.body,
+    note: 'This bypasses the breaks router to test POST functionality'
   });
 });
 
