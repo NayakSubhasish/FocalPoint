@@ -12,6 +12,15 @@ router.get('/debug', (req, res) => {
   });
 });
 
+// Test route without authentication
+router.get('/test', (req, res) => {
+  res.json({ 
+    message: 'Breaks router test endpoint working',
+    timestamp: new Date().toISOString(),
+    path: req.originalUrl
+  });
+});
+
 // Get all breaks for the authenticated user
 router.get('/', auth, async (req, res) => {
   try {
@@ -36,8 +45,12 @@ router.get('/', auth, async (req, res) => {
 // Get all breaks for admins, project managers, and team leaders
 router.get('/all', auth, async (req, res) => {
   try {
+    console.log('=== BREAKS /ALL ENDPOINT CALLED ===');
+    console.log('Request URL:', req.originalUrl);
+    console.log('Request method:', req.method);
     console.log('User role:', req.user.role);
     console.log('User ID:', req.user.id);
+    console.log('Headers:', req.headers);
     
     // Check if user has appropriate role
     if (!['admin', 'project_manager', 'team_leader'].includes(req.user.role)) {
@@ -58,8 +71,10 @@ router.get('/all', auth, async (req, res) => {
     });
     
     console.log('Found breaks:', breaks.length);
+    console.log('=== BREAKS /ALL ENDPOINT SUCCESS ===');
     res.json(breaks);
   } catch (error) {
+    console.error('=== BREAKS /ALL ENDPOINT ERROR ===');
     console.error('Error fetching all breaks:', error);
     console.error('Error stack:', error.stack);
     res.status(500).json({ message: 'Internal server error', error: error.message });

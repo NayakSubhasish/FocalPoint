@@ -51,10 +51,33 @@ app.get('/api/routes', (req, res) => {
   res.json({ routes });
 });
 
+// Catch-all route for unmatched paths
+app.use('*', (req, res) => {
+  console.log('404 - Route not found:', req.originalUrl);
+  res.status(404).json({ 
+    message: 'Route not found', 
+    path: req.originalUrl,
+    availableRoutes: [
+      '/api/health',
+      '/api/routes',
+      '/api/auth/*',
+      '/api/dashboard/*',
+      '/api/projects/*',
+      '/api/users/*',
+      '/api/tasks/*',
+      '/api/time-transactions/*',
+      '/api/breaks/*'
+    ]
+  });
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+  console.error('Error:', err.stack);
+  res.status(500).json({ 
+    message: 'Something went wrong!',
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+  });
 });
 
 const PORT = process.env.PORT || 5000;
