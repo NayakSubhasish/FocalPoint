@@ -157,13 +157,23 @@ const BreakAndLeisure = () => {
   const handleStartBreak = async () => {
     try {
       const token = localStorage.getItem('token');
+
+      // Convert startTime (if present) to ISO string to ensure consistency across environments
+      const startPayload = { ...formData };
+      if (startPayload.startTime) {
+        const s = new Date(startPayload.startTime);
+        if (!isNaN(s)) {
+          startPayload.startTime = s.toISOString();
+        }
+      }
+
       const response = await fetch(`${process.env.REACT_APP_API_URL}/breaks/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(startPayload),
       });
       if (!response.ok) throw new Error('Failed to start break');
       const data = await response.json();
@@ -220,6 +230,22 @@ const BreakAndLeisure = () => {
       
       // Ensure userId is set for team members
       const requestData = { ...formData };
+
+      // ==== NEW: normalize date fields to ISO (UTC) to avoid timezone shifts ====
+      if (requestData.startTime) {
+        const start = new Date(requestData.startTime);
+        if (!isNaN(start)) {
+          requestData.startTime = start.toISOString();
+        }
+      }
+      if (requestData.endTime) {
+        const end = new Date(requestData.endTime);
+        if (!isNaN(end)) {
+          requestData.endTime = end.toISOString();
+        }
+      }
+      // ========================================================================
+
       if (user?.role === 'team_member') {
         requestData.userId = user.id; // Always use the current user's ID for team members
       }
