@@ -208,7 +208,13 @@ router.put('/:id/end', auth, async (req, res) => {
 // Create a new break (manual entry)
 router.post('/', auth, async (req, res) => {
   try {
-    const { userId, type, description, startTime, endTime } = req.body;
+    let { userId, type, description, startTime, endTime } = req.body;
+
+    // Map disallowed type values to permitted one to satisfy DB constraint
+    if (type === 'meeting') {
+      console.warn('Type "meeting" not allowed by DB constraint – storing as "other"');
+      type = 'other';
+    }
     
     console.log('Creating break - User role:', req.user.role);
     console.log('Creating break - User ID:', req.user.id);
@@ -229,12 +235,12 @@ router.post('/', auth, async (req, res) => {
     console.log('Current user ID type:', typeof req.user.id);
     
     // Convert userId to number if it's a string
-    const numericUserId = userId ? parseInt(userId) : null;
+    const numericUserId = userId ? Number(userId) : null;
     console.log('Numeric userId:', numericUserId);
     
-    if (userId && ['admin', 'project_manager', 'team_leader'].includes(req.user.role)) {
+    if (numericUserId && ['admin', 'project_manager', 'team_leader'].includes(req.user.role)) {
       // Admin, project managers, and team leaders can create breaks for other users
-      targetUserId = userId;
+      targetUserId = numericUserId;
       console.log('Admin/PM/TL creating break for user:', targetUserId);
     } else if (!['admin', 'project_manager', 'team_leader'].includes(req.user.role)) {
       // Team members can only create breaks for themselves - always use their own ID
@@ -256,7 +262,7 @@ router.post('/', auth, async (req, res) => {
     }
     
     const newBreak = await db.Break.create({
-      userId: targetUserId,
+      userId: Number(targetUserId),
       type,
       description: description || '',
       startTime: new Date(startTime),
@@ -279,6 +285,10 @@ router.post('/', auth, async (req, res) => {
     res.status(201).json(breakWithUser);
   } catch (error) {
     console.error('Error creating break:', error);
+    // Provide more context for debugging
+    if (error.errors) {
+      error.errors.forEach((e)=>console.error('Validation error:', e.message));
+    }
     res.status(500).json({ message: 'Internal server error' });
   }
 });
@@ -286,7 +296,13 @@ router.post('/', auth, async (req, res) => {
 // Update a break
 router.put('/:id', auth, async (req, res) => {
   try {
-    const { userId, type, description, startTime, endTime } = req.body;
+    let { userId, type, description, startTime, endTime } = req.body;
+
+    // Map disallowed type values to permitted one to satisfy DB constraint
+    if (type === 'meeting') {
+      console.warn('Type "meeting" not allowed by DB constraint – storing as "other"');
+      type = 'other';
+    }
     
     // Team members cannot edit breaks
     if (req.user.role === 'team_member') {
