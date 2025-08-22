@@ -579,4 +579,245 @@ router.get('/reports/breaks-leisure', auth, async (req, res) => {
   }
 });
 
+// ✅ Agent-wise Daily Report - comprehensive daily transaction and break analysis per agent
+router.get('/reports/agent-wise-daily', auth, async (req, res) => {
+  try {
+    const targetDate = req.query.date && !isNaN(new Date(req.query.date))
+      ? new Date(req.query.date)
+      : new Date();
+
+    const dateStr = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    // Role-based access control
+    const role = req.user.role;
+    const userId = req.user.id;
+    let userFilter = {};
+    
+    if (role === 'team_member') {
+      userFilter = { id: userId };
+    } else if (role === 'team_leader') {
+      // Team leaders can see reports for their team members
+      const leadProjects = await sequelize.models.ProjectTeam.findAll({ 
+        where: { userId, role: 'lead' } 
+      });
+      const projectIds = leadProjects.map(pt => pt.projectId);
+      const members = await sequelize.models.ProjectTeam.findAll({ 
+        where: { projectId: projectIds, role: 'member' } 
+      });
+      const memberIds = [...new Set(members.map(pt => pt.userId))];
+      userFilter = { id: [userId, ...memberIds] };
+    }
+    // Admins and project managers can see all users (no filter)
+
+    // Get all users based on role permissions
+    const users = await User.findAll({
+      where: userFilter,
+      attributes: ['id', 'name', 'email'],
+      order: [['name', 'ASC']]
+    });
+
+    const agentReports = await Promise.all(users.map(async (user) => {
+      // Get time entries for the user on the target date
+      const timeEntries = await TimeEntry.findAll({
+        where: { 
+          userId: user.id,
+          date: dateStr 
+        },
+        include: [
+          {
+            model: Task,
+            as: 'task',
+            attributes: ['id', 'title'],
+            include: [{ 
+              model: Project, 
+              attributes: ['id', 'name'] 
+            }]
+          }
+        ],
+        order: [['createdAt', 'ASC']]
+      });
+
+      // Get breaks for the user on the target date
+      const breaks = await Break.findAll({
+        where: {
+          userId: user.id,
+          startTime: {
+            [Op.between]: [
+              new Date(`${dateStr}T00:00:00.000Z`),
+              new Date(`${dateStr}T23:59:59.999Z`)
+            ]
+          }
+        },
+        order: [['startTime', 'ASC']]
+      });
+
+      // Calculate work metrics
+      const totalWorkHours = timeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+      const totalTransactions = timeEntries.reduce((sum, entry) => sum + (entry.transactions || 0), 0);
+      
+      // Calculate break metrics
+      const totalBreaks = breaks.length;
+      const totalBreakMinutes = breaks.reduce((sum, b) => sum + (b.duration || 0), 0);
+      const totalBreakHours = totalBreakMinutes / 60;
+      
+      // Office hours analysis (9 hours total: 8 work + 1 break)
+      const expectedWorkHours = 8;
+      const expectedBreakHours = 1;
+      const expectedTotalHours = 9;
+      
+      // Calculate efficiency and compliance
+      const workHoursCompliance = totalWorkHours >= expectedWorkHours ? 100 : (totalWorkHours / expectedWorkHours) * 100;
+      const breakHoursCompliance = totalBreakHours <= expectedBreakHours ? 100 : Math.max(0, 100 - ((totalBreakHours - expectedBreakHours) / expectedBreakHours) * 100);
+      const overallCompliance = (workHoursCompliance + breakHoursCompliance) / 2;
+      
+      // Productivity metrics
+      const transactionsPerHour = totalWorkHours > 0 ? totalTransactions / totalWorkHours : 0;
+      const averageMinutesPerTransaction = totalTransactions > 0 ? (totalWorkHours * 60) / totalTransactions : 0;
+      
+      // Break analysis
+      const breaksByType = breaks.reduce((acc, b) => {
+        const type = b.type;
+        if (!acc[type]) {
+          acc[type] = { count: 0, duration: 0 };
+        }
+        acc[type].count++;
+        acc[type].duration += b.duration || 0;
+        return acc;
+      }, {});
+      
+      // Time distribution throughout the day
+      const hourlyDistribution = Array.from({ length: 24 }, (_, hour) => {
+        const hourStart = new Date(`${dateStr}T${String(hour).padStart(2, '0')}:00:00.000Z`);
+        const hourEnd = new Date(`${dateStr}T${String(hour).padStart(2, '0')}:59:59.999Z`);
+        
+        const workInHour = timeEntries.filter(entry => {
+          const entryTime = new Date(entry.createdAt);
+          return entryTime >= hourStart && entryTime <= hourEnd;
+        }).reduce((sum, entry) => sum + (entry.hours || 0), 0);
+        
+        const breaksInHour = breaks.filter(b => {
+          const breakStart = new Date(b.startTime);
+          return breakStart >= hourStart && breakStart <= hourEnd;
+        });
+        
+        return {
+          hour,
+          workHours: workInHour,
+          breakCount: breaksInHour.length,
+          breakMinutes: breaksInHour.reduce((sum, b) => sum + (b.duration || 0), 0)
+        };
+      });
+
+      return {
+        agent: {
+          id: user.id,
+          name: user.name,
+          email: user.email
+        },
+        date: dateStr,
+        workMetrics: {
+          totalWorkHours: parseFloat(totalWorkHours.toFixed(2)),
+          totalTransactions,
+          transactionsPerHour: parseFloat(transactionsPerHour.toFixed(2)),
+          averageMinutesPerTransaction: parseFloat(averageMinutesPerTransaction.toFixed(2)),
+          workHoursCompliance: parseFloat(workHoursCompliance.toFixed(1))
+        },
+        breakMetrics: {
+          totalBreaks,
+          totalBreakMinutes,
+          totalBreakHours: parseFloat(totalBreakHours.toFixed(2)),
+          breaksByType,
+          breakHoursCompliance: parseFloat(breakHoursCompliance.toFixed(1)),
+          averageBreakDuration: totalBreaks > 0 ? Math.round(totalBreakMinutes / totalBreaks) : 0
+        },
+        officeHours: {
+          expectedWorkHours,
+          expectedBreakHours,
+          expectedTotalHours,
+          actualTotalHours: parseFloat((totalWorkHours + totalBreakHours).toFixed(2)),
+          overallCompliance: parseFloat(overallCompliance.toFixed(1)),
+          hoursDeficit: Math.max(0, expectedWorkHours - totalWorkHours),
+          excessBreakHours: Math.max(0, totalBreakHours - expectedBreakHours)
+        },
+        projectBreakdown: timeEntries.reduce((acc, entry) => {
+          const projectName = entry.task?.Project?.name || 'Unknown Project';
+          const taskTitle = entry.task?.title || 'Unknown Task';
+          
+          if (!acc[projectName]) {
+            acc[projectName] = { 
+              hours: 0, 
+              transactions: 0, 
+              tasks: {} 
+            };
+          }
+          
+          acc[projectName].hours += entry.hours || 0;
+          acc[projectName].transactions += entry.transactions || 0;
+          
+          if (!acc[projectName].tasks[taskTitle]) {
+            acc[projectName].tasks[taskTitle] = { 
+              hours: 0, 
+              transactions: 0 
+            };
+          }
+          
+          acc[projectName].tasks[taskTitle].hours += entry.hours || 0;
+          acc[projectName].tasks[taskTitle].transactions += entry.transactions || 0;
+          
+          return acc;
+        }, {}),
+        hourlyDistribution,
+        detailedTimeEntries: timeEntries.map(entry => ({
+          id: entry.id,
+          project: entry.task?.Project?.name || 'Unknown',
+          task: entry.task?.title || 'Unknown',
+          hours: entry.hours,
+          transactions: entry.transactions,
+          fileName: entry.fileName,
+          transactionType: entry.transactionType,
+          createdAt: entry.createdAt
+        })),
+        detailedBreaks: breaks.map(b => ({
+          id: b.id,
+          type: b.type,
+          description: b.description,
+          startTime: b.startTime,
+          endTime: b.endTime,
+          duration: b.duration,
+          durationHours: b.duration ? parseFloat((b.duration / 60).toFixed(2)) : 0,
+          isActive: b.isActive
+        }))
+      };
+    }));
+
+    // Calculate team summary if multiple agents
+    const teamSummary = agentReports.length > 1 ? {
+      totalAgents: agentReports.length,
+      totalWorkHours: agentReports.reduce((sum, agent) => sum + agent.workMetrics.totalWorkHours, 0),
+      totalTransactions: agentReports.reduce((sum, agent) => sum + agent.workMetrics.totalTransactions, 0),
+      totalBreaks: agentReports.reduce((sum, agent) => sum + agent.breakMetrics.totalBreaks, 0),
+      totalBreakHours: agentReports.reduce((sum, agent) => sum + agent.breakMetrics.totalBreakHours, 0),
+      averageCompliance: agentReports.reduce((sum, agent) => sum + agent.officeHours.overallCompliance, 0) / agentReports.length,
+      topPerformer: agentReports.reduce((top, agent) => 
+        agent.workMetrics.transactionsPerHour > (top?.workMetrics?.transactionsPerHour || 0) ? agent : top
+      , null),
+      complianceBreakdown: {
+        fullyCompliant: agentReports.filter(agent => agent.officeHours.overallCompliance >= 90).length,
+        partiallyCompliant: agentReports.filter(agent => agent.officeHours.overallCompliance >= 70 && agent.officeHours.overallCompliance < 90).length,
+        nonCompliant: agentReports.filter(agent => agent.officeHours.overallCompliance < 70).length
+      }
+    } : null;
+
+    res.json({
+      date: dateStr,
+      agentReports,
+      teamSummary
+    });
+
+  } catch (error) {
+    console.error('Agent-wise daily report error:', error);
+    res.status(500).json({ message: 'Error fetching agent-wise daily report' });
+  }
+});
+
 module.exports = router;

@@ -206,6 +206,13 @@ const reportList = [
     icon: <CoffeeIcon />, 
     description: 'Comprehensive break and leisure time analysis',
     color: 'error'
+  },
+  { 
+    key: 'agentWiseDaily', 
+    label: 'Agent-wise Daily Report', 
+    icon: <GroupIcon />, 
+    description: 'Daily transaction and break analysis per employee (9hr office schedule)',
+    color: 'primary'
   }
 ];
 
@@ -219,7 +226,8 @@ const reportConfig = {
   projectReport: { endpoint: 'project-report', title: 'Project Overview' },
   dailyUserLogs: { endpoint: 'user-daily-logs', title: 'Daily Time Logs' },
   monthlyUserLogs: { endpoint: 'user-monthly-logs', title: 'Monthly Time Logs' },
-  breaksLeisure: { endpoint: 'breaks-leisure', title: 'Breaks & Leisure Report' }
+  breaksLeisure: { endpoint: 'breaks-leisure', title: 'Breaks & Leisure Report' },
+  agentWiseDaily: { endpoint: 'agent-wise-daily', title: 'Agent-wise Daily Report' }
 };
 
 const Dashboard = () => {
@@ -313,6 +321,8 @@ const Dashboard = () => {
       fetchReportData(key, { date: dailyDate });
     } else if (key === 'monthlyUserLogs') {
       fetchReportData(key, { month: monthlyFilter });
+    } else if (key === 'agentWiseDaily') {
+      fetchReportData(key, { date: dailyDate });
     } else {
       fetchReportData(key);
     }
@@ -322,6 +332,8 @@ const Dashboard = () => {
   useEffect(() => {
     if (selectedReport === 'dailyUserLogs') {
       fetchReportData('dailyUserLogs', { date: dailyDate });
+    } else if (selectedReport === 'agentWiseDaily') {
+      fetchReportData('agentWiseDaily', { date: dailyDate });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dailyDate]);
@@ -377,6 +389,8 @@ const Dashboard = () => {
       if (!reportData || reportData.length === 0) return;
     } else if (selectedReport === 'dailyUserLogs' || selectedReport === 'monthlyUserLogs') {
       if (!reportData || reportData.length === 0) return;
+    } else if (selectedReport === 'agentWiseDaily') {
+      if (!reportData.agentReports || reportData.agentReports.length === 0) return;
     } else {
       if (!reportData || reportData.length === 0) return;
     }
@@ -422,6 +436,23 @@ const Dashboard = () => {
           row.totalHours,
           recordsPerAgent,
           timePerAgent
+        ].join(','));
+      });
+    } else if (selectedReport === 'agentWiseDaily') {
+      headers = ['Agent','Date','Work Hours','Transactions','Transactions/Hour','Break Hours','Break Count','Work Compliance %','Break Compliance %','Overall Compliance %'];
+      csvRows = [headers.join(',')];
+      reportData.agentReports.forEach((agent) => {
+        csvRows.push([
+          agent.agent.name,
+          agent.date,
+          agent.workMetrics.totalWorkHours,
+          agent.workMetrics.totalTransactions,
+          agent.workMetrics.transactionsPerHour,
+          agent.breakMetrics.totalBreakHours,
+          agent.breakMetrics.totalBreaks,
+          agent.workMetrics.workHoursCompliance,
+          agent.breakMetrics.breakHoursCompliance,
+          agent.officeHours.overallCompliance
         ].join(','));
       });
     } else {
@@ -1088,6 +1119,279 @@ const Dashboard = () => {
                   </TableBody>
                 </Table>
               </TableContainer>
+            </>
+          ) : selectedReport === 'agentWiseDaily' ? (
+            <>
+              <Box mb={2} display="flex" gap={2}>
+                <TextField
+                  type="date"
+                  label="Select Date"
+                  size="small"
+                  value={dailyDate}
+                  onChange={(e) => setDailyDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Box>
+              
+              {/* Team Summary */}
+              {reportData.teamSummary && (
+                <Box mb={4}>
+                  <Typography variant="h6" mb={2} sx={{ color: '#000000' }}>Team Summary</Typography>
+                  <Grid container spacing={2} mb={3}>
+                    <Grid item xs={12} sm={6} md={2}>
+                      <Card sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'white' }}>
+                        <Typography variant="h6">{reportData.teamSummary.totalAgents}</Typography>
+                        <Typography variant="body2">Total Agents</Typography>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={2}>
+                      <Card sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'white' }}>
+                        <Typography variant="h6">{reportData.teamSummary.totalWorkHours.toFixed(1)}h</Typography>
+                        <Typography variant="body2">Total Work Hours</Typography>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={2}>
+                      <Card sx={{ p: 2, textAlign: 'center', bgcolor: 'info.light', color: 'white' }}>
+                        <Typography variant="h6">{reportData.teamSummary.totalTransactions.toLocaleString()}</Typography>
+                        <Typography variant="body2">Total Transactions</Typography>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={2}>
+                      <Card sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.light', color: 'white' }}>
+                        <Typography variant="h6">{reportData.teamSummary.totalBreaks}</Typography>
+                        <Typography variant="body2">Total Breaks</Typography>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={2}>
+                      <Card sx={{ p: 2, textAlign: 'center', bgcolor: 'secondary.light', color: 'white' }}>
+                        <Typography variant="h6">{reportData.teamSummary.averageCompliance.toFixed(1)}%</Typography>
+                        <Typography variant="body2">Avg Compliance</Typography>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={2}>
+                      <Card sx={{ p: 2, textAlign: 'center', bgcolor: 'error.light', color: 'white' }}>
+                        <Typography variant="h6">{reportData.teamSummary.topPerformer?.agent?.name || 'N/A'}</Typography>
+                        <Typography variant="body2">Top Performer</Typography>
+                      </Card>
+                    </Grid>
+                  </Grid>
+                  
+                  {/* Compliance Breakdown */}
+                  <Grid container spacing={2} mb={3}>
+                    <Grid item xs={12} md={4}>
+                      <Card sx={{ p: 2, textAlign: 'center', bgcolor: 'success.main', color: 'white' }}>
+                        <Typography variant="h4">{reportData.teamSummary.complianceBreakdown.fullyCompliant}</Typography>
+                        <Typography variant="body1">Fully Compliant (≥90%)</Typography>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <Card sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.main', color: 'white' }}>
+                        <Typography variant="h4">{reportData.teamSummary.complianceBreakdown.partiallyCompliant}</Typography>
+                        <Typography variant="body1">Partially Compliant (70-89%)</Typography>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <Card sx={{ p: 2, textAlign: 'center', bgcolor: 'error.main', color: 'white' }}>
+                        <Typography variant="h4">{reportData.teamSummary.complianceBreakdown.nonCompliant}</Typography>
+                        <Typography variant="body1">Non-Compliant (&lt;70%)</Typography>
+                      </Card>
+                    </Grid>
+                  </Grid>
+                </Box>
+              )}
+
+              {/* Individual Agent Reports */}
+              <Typography variant="h6" mb={2} sx={{ color: '#000000' }}>Individual Agent Reports</Typography>
+              {reportData.agentReports?.map((agent, index) => (
+                <Box key={agent.agent.id} mb={4}>
+                  <Card sx={{ p: 3, borderRadius: 3, boxShadow: 3 }}>
+                    {/* Agent Header */}
+                    <Box display="flex" alignItems="center" gap={2} mb={3}>
+                      <Avatar sx={{ bgcolor: 'primary.main', width: 50, height: 50 }}>
+                        {agent.agent.name.charAt(0).toUpperCase()}
+                      </Avatar>
+                      <Box flex={1}>
+                        <Typography variant="h5" sx={{ fontWeight: 600, color: '#000000' }}>
+                          {agent.agent.name}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#666666' }}>
+                          {agent.agent.email} • {agent.date}
+                        </Typography>
+                      </Box>
+                      <Chip 
+                        label={`${agent.officeHours.overallCompliance}% Compliant`}
+                        color={agent.officeHours.overallCompliance >= 90 ? 'success' : agent.officeHours.overallCompliance >= 70 ? 'warning' : 'error'}
+                        sx={{ fontWeight: 600 }}
+                      />
+                    </Box>
+                    
+                    {/* Key Metrics Grid */}
+                    <Grid container spacing={2} mb={3}>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box textAlign="center" p={2} bgcolor="primary.light" borderRadius={2} color="white">
+                          <Typography variant="h4">{agent.workMetrics.totalWorkHours}h</Typography>
+                          <Typography variant="body2">Work Hours</Typography>
+                          <Typography variant="caption">Target: 8h</Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box textAlign="center" p={2} bgcolor="success.light" borderRadius={2} color="white">
+                          <Typography variant="h4">{agent.workMetrics.totalTransactions.toLocaleString()}</Typography>
+                          <Typography variant="body2">Transactions</Typography>
+                          <Typography variant="caption">{agent.workMetrics.transactionsPerHour.toFixed(1)}/hr</Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box textAlign="center" p={2} bgcolor="warning.light" borderRadius={2} color="white">
+                          <Typography variant="h4">{agent.breakMetrics.totalBreakHours.toFixed(1)}h</Typography>
+                          <Typography variant="body2">Break Hours</Typography>
+                          <Typography variant="caption">Target: 1h</Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box textAlign="center" p={2} bgcolor="info.light" borderRadius={2} color="white">
+                          <Typography variant="h4">{agent.breakMetrics.totalBreaks}</Typography>
+                          <Typography variant="body2">Total Breaks</Typography>
+                          <Typography variant="caption">{agent.breakMetrics.averageBreakDuration}min avg</Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                    
+                    {/* Office Hours Compliance */}
+                    <Box mb={3}>
+                      <Typography variant="h6" mb={2} sx={{ color: '#000000' }}>Office Hours Compliance (9hr schedule: 8hr work + 1hr break)</Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} md={4}>
+                          <Box>
+                            <Box display="flex" justifyContent="space-between" mb={1}>
+                              <Typography variant="body2">Work Hours</Typography>
+                              <Typography variant="body2">{agent.workMetrics.workHoursCompliance.toFixed(1)}%</Typography>
+                            </Box>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={Math.min(agent.workMetrics.workHoursCompliance, 100)} 
+                              sx={{ height: 8, borderRadius: 4 }}
+                              color={agent.workMetrics.workHoursCompliance >= 90 ? 'success' : agent.workMetrics.workHoursCompliance >= 70 ? 'warning' : 'error'}
+                            />
+                          </Box>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <Box>
+                            <Box display="flex" justifyContent="space-between" mb={1}>
+                              <Typography variant="body2">Break Hours</Typography>
+                              <Typography variant="body2">{agent.breakMetrics.breakHoursCompliance.toFixed(1)}%</Typography>
+                            </Box>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={Math.min(agent.breakMetrics.breakHoursCompliance, 100)} 
+                              sx={{ height: 8, borderRadius: 4 }}
+                              color={agent.breakMetrics.breakHoursCompliance >= 90 ? 'success' : agent.breakMetrics.breakHoursCompliance >= 70 ? 'warning' : 'error'}
+                            />
+                          </Box>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <Box>
+                            <Box display="flex" justifyContent="space-between" mb={1}>
+                              <Typography variant="body2">Overall</Typography>
+                              <Typography variant="body2">{agent.officeHours.overallCompliance.toFixed(1)}%</Typography>
+                            </Box>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={Math.min(agent.officeHours.overallCompliance, 100)} 
+                              sx={{ height: 8, borderRadius: 4 }}
+                              color={agent.officeHours.overallCompliance >= 90 ? 'success' : agent.officeHours.overallCompliance >= 70 ? 'warning' : 'error'}
+                            />
+                          </Box>
+                        </Grid>
+                      </Grid>
+                    </Box>
+                    
+                    {/* Project Breakdown */}
+                    {Object.keys(agent.projectBreakdown).length > 0 && (
+                      <Box mb={3}>
+                        <Typography variant="h6" mb={2} sx={{ color: '#000000' }}>Project Breakdown</Typography>
+                        <TableContainer component={Paper} sx={{ maxHeight: 300, borderRadius: 2 }}>
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Project</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Hours</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Transactions</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Tasks</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {Object.entries(agent.projectBreakdown).map(([projectName, projectData]) => (
+                                <TableRow key={projectName}>
+                                  <TableCell sx={{ fontWeight: 500 }}>{projectName}</TableCell>
+                                  <TableCell>{projectData.hours.toFixed(2)}</TableCell>
+                                  <TableCell>{projectData.transactions}</TableCell>
+                                  <TableCell>
+                                    <Box display="flex" flexWrap="wrap" gap={0.5}>
+                                      {Object.entries(projectData.tasks).map(([taskName, taskData]) => (
+                                        <Chip 
+                                          key={taskName} 
+                                          label={`${taskName} (${taskData.hours.toFixed(1)}h, ${taskData.transactions}t)`} 
+                                          size="small" 
+                                          variant="outlined"
+                                        />
+                                      ))}
+                                    </Box>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </Box>
+                    )}
+                    
+                    {/* Break Details */}
+                    {agent.detailedBreaks.length > 0 && (
+                      <Box>
+                        <Typography variant="h6" mb={2} sx={{ color: '#000000' }}>Break Details</Typography>
+                        <TableContainer component={Paper} sx={{ maxHeight: 300, borderRadius: 2 }}>
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Start Time</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>End Time</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Duration</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {agent.detailedBreaks.map((breakItem) => (
+                                <TableRow key={breakItem.id}>
+                                  <TableCell>
+                                    <Chip 
+                                      label={breakItem.type.charAt(0).toUpperCase() + breakItem.type.slice(1)} 
+                                      size="small" 
+                                      color="primary" 
+                                      variant="outlined"
+                                    />
+                                  </TableCell>
+                                  <TableCell>{new Date(breakItem.startTime).toLocaleTimeString()}</TableCell>
+                                  <TableCell>{breakItem.endTime ? new Date(breakItem.endTime).toLocaleTimeString() : 'Active'}</TableCell>
+                                  <TableCell>{breakItem.duration ? `${breakItem.duration}min` : '-'}</TableCell>
+                                  <TableCell>
+                                    <Chip 
+                                      label={breakItem.isActive ? 'Active' : 'Completed'} 
+                                      size="small" 
+                                      color={breakItem.isActive ? 'warning' : 'success'}
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </Box>
+                    )}
+                  </Card>
+                </Box>
+              ))}
             </>
           ) : selectedReport === 'breaksLeisure' ? (
             <Box>
